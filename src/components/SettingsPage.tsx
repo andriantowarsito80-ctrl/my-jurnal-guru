@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Save,
@@ -13,6 +13,7 @@ import {
   UserCheck,
   Sliders,
   ShieldCheck,
+  Cloud,
 } from 'lucide-react';
 import {
   AppState,
@@ -21,26 +22,27 @@ import {
 } from '../types';
 import { formatIndonesianDate } from '../utils/dateUtils';
 import teacherPortraitImg from '../assets/images/teacher_portrait_1794569693145.jpg';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SettingsPageProps {
   state: AppState;
+  cloudUserEmail?: string | null;
   onUpdateSchoolProfile: (profile: SchoolProfile) => void;
   onUpdateTeacherProfile: (profile: TeacherProfile) => void;
   onAddHoliday: (tanggal: string, keterangan: string) => void;
   onDeleteHoliday: (id: string) => void;
   onUpdateWeights: (tugas: number, asas: number) => void;
-  onUpdatePassword: (newPassword: string) => void;
   onResetAllData: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   state,
+  cloudUserEmail,
   onUpdateSchoolProfile,
   onUpdateTeacherProfile,
   onAddHoliday,
   onDeleteHoliday,
   onUpdateWeights,
-  onUpdatePassword,
   onResetAllData,
 }) => {
   const [schoolForm, setSchoolForm] = useState<SchoolProfile>(
@@ -59,11 +61,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [weightTugas, setWeightTugas] = useState(state.gradeWeightTugas);
   const [weightAsas, setWeightAsas] = useState(state.gradeWeightAsas);
 
-  const [newPassword, setNewPassword] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
 
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    setSchoolForm(state.schoolProfile);
+  }, [state.schoolProfile]);
+
+  useEffect(() => {
+    setTeacherForm(state.teacherProfile);
+    setSubjectsText(state.teacherProfile.mataPelajaran.join('\n'));
+  }, [state.teacherProfile]);
+
+  useEffect(() => {
+    setWeightTugas(state.gradeWeightTugas);
+    setWeightAsas(state.gradeWeightAsas);
+  }, [state.gradeWeightTugas, state.gradeWeightAsas]);
 
   const showToast = (msg: string) => {
     setSavedNotice(msg);
@@ -94,12 +109,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setTeacherForm((prev) => ({
-          ...prev,
-          fotoProfil: reader.result as string,
-        }));
-      }
+      if (typeof reader.result !== 'string') return;
+      const img = new Image();
+      img.onload = () => {
+        const maxSize = 200;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
+          setTeacherForm((prev) => ({
+            ...prev,
+            fotoProfil: compressed,
+          }));
+        }
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
@@ -119,14 +149,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     e.preventDefault();
     onUpdateWeights(weightTugas, weightAsas);
     showToast('Bobot perhitungan Nilai Rapot berhasil disimpan.');
-  };
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.trim().length < 4) return;
-    onUpdatePassword(newPassword.trim());
-    setNewPassword('');
-    showToast('Password login berhasil diperbarui.');
   };
 
   return (
@@ -557,44 +579,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </form>
 
         <div className="bg-gradient-to-br from-amber-50/75 via-white to-orange-50/50 border border-amber-200 rounded-xl p-6 space-y-5">
-          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center gap-2.5 pb-2 border-b border-amber-100">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Keamanan & Reset Data
+                  Sinkronisasi Cloud & Perangkat
                 </h2>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Username aktif:{' '}
-                  <strong className="font-mono">
-                    {state.credentials.username}
+                  Akun Google aktif:{' '}
+                  <strong className="font-mono text-slate-900">
+                    {cloudUserEmail || state.teacherProfile.email}
                   </strong>
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Password baru (min. 4 karakter)"
-                className="flex-1 h-10 px-3 rounded-lg border border-amber-200 bg-white text-sm"
-              />
-              <motion.button
-                type="submit"
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                className="px-4 h-10 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
-              >
-                Ubah Password
-              </motion.button>
+
+            <div className="rounded-lg bg-white/90 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-slate-700">
+              <Cloud className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <p>
+                  Seluruh perubahan data otomatis tersinkron ke cloud. Login dengan email Google yang sama di HP, tablet, atau komputer lain agar data tetap terhubung.
+                </p>
+                <PWAInstallButton variant="login" />
+              </div>
             </div>
-          </form>
+          </div>
 
           <div className="pt-3 border-t border-amber-100 flex items-center justify-between gap-3">
             <div className="text-xs text-slate-600">
-              Kembalikan seluruh data ke pengaturan awal aplikasi.
+              Kembalikan seluruh data cloud ke pengaturan awal aplikasi.
             </div>
             {confirmReset ? (
               <div className="flex items-center gap-2 shrink-0">
@@ -604,7 +620,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   onClick={() => {
                     onResetAllData();
                     setConfirmReset(false);
-                    showToast('Data berhasil dikembalikan ke kondisi awal.');
+                    showToast('Data cloud berhasil dikembalikan ke kondisi awal.');
                   }}
                   className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold cursor-pointer"
                 >

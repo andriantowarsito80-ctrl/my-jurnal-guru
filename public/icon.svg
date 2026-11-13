@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="55%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#0d9488" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="408" cy="108" r="64" fill="#ffffff" fill-opacity="0.1" />
+  <circle cx="104" cy="404" r="80" fill="#ffffff" fill-opacity="0.08" />
+  <!-- Graduation Cap -->
+  <polygon points="256,118 408,186 256,254 104,186" fill="#ffffff" />
+  <path d="M162 214 v58 c0 28 42 50 94 50 s94 -22 94 -50 v-58 l-94 42 z" fill="#e0e7ff" />
+  <line x1="382" y1="198" x2="382" y2="288" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" />
+  <circle cx="382" cy="298" r="16" fill="url(#accent)" />
+  <!-- Open Book -->
+  <path d="M142 324 c36 -18 82 -14 114 8 c32 -22 78 -26 114 -8 v76 c-36 -18 -82 -14 -114 8 c-32 -22 -78 -26 -114 -8 z" fill="#ffffff" fill-opacity="0.96" />
+  <line x1="256" y1="332" x2="256" y2="408" stroke="#4f46e5" stroke-width="6" stroke-linecap="round" />
+</svg>

@@ -1,0 +1,408 @@
+{
+  "entities": {
+    "TeacherWorkspace": {
+      "title": "TeacherWorkspace",
+      "description": "Root workspace profile and grading settings for a verified teacher account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "schoolProfile": {
+          "type": "object",
+          "description": "School identity metadata displayed on dashboard and PDF exports."
+        },
+        "teacherProfile": {
+          "type": "object",
+          "description": "Teacher identity metadata including name, NIP, email, subjects, and photo."
+        },
+        "gradeWeightTugas": {
+          "type": "number",
+          "description": "Percentage weight (0-100) for assignment scores."
+        },
+        "gradeWeightAsas": {
+          "type": "number",
+          "description": "Percentage weight (0-100) for ASAS/ASAT exam score."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "schoolProfile",
+        "teacherProfile",
+        "gradeWeightTugas",
+        "gradeWeightAsas",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudentDoc": {
+      "title": "StudentDoc",
+      "description": "Student master record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "nama": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "kelas": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "nis", "nama", "kelas", "createdAt", "updatedAt"]
+    },
+    "ScheduleDoc": {
+      "title": "ScheduleDoc",
+      "description": "Teaching schedule entry for a 5-day school week.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "hari": {
+          "type": "string",
+          "enum": ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+        },
+        "jamKe": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "waktu": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "kelas": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "mataPelajaran": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "hari",
+        "jamKe",
+        "waktu",
+        "kelas",
+        "mataPelajaran",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AttendanceDoc": {
+      "title": "AttendanceDoc",
+      "description": "Daily attendance status for a single student.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "dateISO": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Hadir", "Izin", "Sakit", "Alpa"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "dateISO", "studentId", "status", "createdAt", "updatedAt"]
+    },
+    "NoteDoc": {
+      "title": "NoteDoc",
+      "description": "Teacher lesson journal and reflection note.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "tanggal": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "hari": {
+          "type": "string",
+          "enum": ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+        },
+        "jamKe": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "waktu": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "kelas": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "mataPelajaran": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "materi": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "kegiatan": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "catatan": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "tanggal",
+        "hari",
+        "jamKe",
+        "waktu",
+        "kelas",
+        "mataPelajaran",
+        "materi",
+        "kegiatan",
+        "catatan",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GradeDoc": {
+      "title": "GradeDoc",
+      "description": "Student assignment and exam grades for a subject.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mataPelajaran": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "tugas": {
+          "type": "array",
+          "description": "Fixed 11-slot array for Tugas 1 through Tugas 11."
+        },
+        "asasAsat": {
+          "type": "number",
+          "description": "Optional ASAS/ASAT exam score (or null)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "studentId",
+        "mataPelajaran",
+        "tugas",
+        "asasAsat",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "HolidayDoc": {
+      "title": "HolidayDoc",
+      "description": "Custom school holiday entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "tanggal": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "keterangan": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "tanggal", "keterangan", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/teachers/{teacherId}": {
+      "schema": {
+        "$ref": "#/entities/TeacherWorkspace"
+      },
+      "description": "Root workspace profile and settings owned by the authenticated teacher."
+    },
+    "/teachers/{teacherId}/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/StudentDoc"
+      },
+      "description": "Students belonging to the teacher workspace."
+    },
+    "/teachers/{teacherId}/schedules/{scheduleId}": {
+      "schema": {
+        "$ref": "#/entities/ScheduleDoc"
+      },
+      "description": "Teaching schedule items belonging to the teacher workspace."
+    },
+    "/teachers/{teacherId}/attendance/{attendanceId}": {
+      "schema": {
+        "$ref": "#/entities/AttendanceDoc"
+      },
+      "description": "Daily attendance records keyed by dateISO__studentId."
+    },
+    "/teachers/{teacherId}/notes/{noteId}": {
+      "schema": {
+        "$ref": "#/entities/NoteDoc"
+      },
+      "description": "Lesson journal notes belonging to the teacher workspace."
+    },
+    "/teachers/{teacherId}/grades/{gradeId}": {
+      "schema": {
+        "$ref": "#/entities/GradeDoc"
+      },
+      "description": "Subject grade records per student belonging to the teacher workspace."
+    },
+    "/teachers/{teacherId}/holidays/{holidayId}": {
+      "schema": {
+        "$ref": "#/entities/HolidayDoc"
+      },
+      "description": "Custom school holidays belonging to the teacher workspace."
+    }
+  }
+}

@@ -1,0 +1,324 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(teacherId) {
+      return isVerifiedUser() && request.auth.uid == teacherId;
+    }
+
+    function isParentWorkspaceOwner(teacherId) {
+      return isOwner(teacherId)
+        && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+    }
+
+    function isValidDateISO(val) {
+      return val is string && val.size() == 10 && val.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function isValidSchoolProfile(sp) {
+      return sp is map
+        && sp.keys().hasAll(['namaSekolah', 'npsn', 'statusAkreditasi', 'kepalaSekolah'])
+        && sp.keys().hasOnly(['namaSekolah', 'npsn', 'statusAkreditasi', 'kepalaSekolah', 'alamat'])
+        && sp.namaSekolah is string && sp.namaSekolah.size() >= 1 && sp.namaSekolah.size() <= 160
+        && sp.npsn is string && sp.npsn.size() >= 1 && sp.npsn.size() <= 30
+        && sp.statusAkreditasi is string && sp.statusAkreditasi.size() >= 1 && sp.statusAkreditasi.size() <= 60
+        && sp.kepalaSekolah is string && sp.kepalaSekolah.size() >= 1 && sp.kepalaSekolah.size() <= 120
+        && (!('alamat' in sp) || (sp.alamat is string && sp.alamat.size() <= 300));
+    }
+
+    function isValidTeacherProfile(tp) {
+      return tp is map
+        && tp.keys().hasAll(['namaGuru', 'nip', 'email', 'mataPelajaran', 'fotoProfil'])
+        && tp.keys().hasOnly(['namaGuru', 'nip', 'email', 'mataPelajaran', 'fotoProfil'])
+        && tp.namaGuru is string && tp.namaGuru.size() >= 1 && tp.namaGuru.size() <= 120
+        && tp.nip is string && tp.nip.size() >= 1 && tp.nip.size() <= 40
+        && tp.email is string && tp.email.size() >= 3 && tp.email.size() <= 120
+        && tp.mataPelajaran is list && tp.mataPelajaran.size() >= 1 && tp.mataPelajaran.size() <= 20
+        && tp.mataPelajaran[0] is string && tp.mataPelajaran[0].size() >= 1 && tp.mataPelajaran[0].size() <= 100
+        && tp.fotoProfil is string && tp.fotoProfil.size() <= 120000;
+    }
+
+    function isValidTeacherWorkspace(data, teacherId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'schoolProfile',
+          'teacherProfile',
+          'gradeWeightTugas',
+          'gradeWeightAsas',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'schoolProfile',
+          'teacherProfile',
+          'gradeWeightTugas',
+          'gradeWeightAsas',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerId is string && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == teacherId
+        && isValidSchoolProfile(data.schoolProfile)
+        && isValidTeacherProfile(data.teacherProfile)
+        && data.gradeWeightTugas is number && data.gradeWeightTugas >= 0 && data.gradeWeightTugas <= 100
+        && data.gradeWeightAsas is number && data.gradeWeightAsas >= 0 && data.gradeWeightAsas <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudent(data, studentId, teacherId) {
+      return data.keys().hasAll(['id', 'ownerId', 'nis', 'nama', 'kelas', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'nis', 'nama', 'kelas', 'createdAt', 'updatedAt'])
+        && data.id is string && isValidId(data.id) && data.id == studentId
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && data.nis is string && data.nis.size() >= 1 && data.nis.size() <= 40
+        && data.nama is string && data.nama.size() >= 1 && data.nama.size() <= 120
+        && data.kelas is string && data.kelas.size() >= 1 && data.kelas.size() <= 40
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSchedule(data, scheduleId, teacherId) {
+      return data.keys().hasAll(['id', 'ownerId', 'hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'createdAt', 'updatedAt'])
+        && data.id is string && isValidId(data.id) && data.id == scheduleId
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && data.hari in ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']
+        && data.jamKe is string && data.jamKe.size() >= 1 && data.jamKe.size() <= 20
+        && data.waktu is string && data.waktu.size() >= 1 && data.waktu.size() <= 30
+        && data.kelas is string && data.kelas.size() >= 1 && data.kelas.size() <= 40
+        && data.mataPelajaran is string && data.mataPelajaran.size() >= 1 && data.mataPelajaran.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAttendance(data, teacherId) {
+      return data.keys().hasAll(['ownerId', 'dateISO', 'studentId', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'dateISO', 'studentId', 'status', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && isValidDateISO(data.dateISO)
+        && data.studentId is string && isValidId(data.studentId)
+        && data.status in ['Hadir', 'Izin', 'Sakit', 'Alpa']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNote(data, noteId, teacherId) {
+      return data.keys().hasAll(['id', 'ownerId', 'tanggal', 'hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'materi', 'kegiatan', 'catatan', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'tanggal', 'hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'materi', 'kegiatan', 'catatan', 'createdAt', 'updatedAt'])
+        && data.id is string && isValidId(data.id) && data.id == noteId
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && isValidDateISO(data.tanggal)
+        && data.hari in ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+        && data.jamKe is string && data.jamKe.size() <= 20
+        && data.waktu is string && data.waktu.size() <= 30
+        && data.kelas is string && data.kelas.size() >= 1 && data.kelas.size() <= 40
+        && data.mataPelajaran is string && data.mataPelajaran.size() >= 1 && data.mataPelajaran.size() <= 100
+        && data.materi is string && data.materi.size() >= 1 && data.materi.size() <= 500
+        && data.kegiatan is string && data.kegiatan.size() <= 2000
+        && data.catatan is string && data.catatan.size() <= 2000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidGrade(data, teacherId) {
+      return data.keys().hasAll(['ownerId', 'studentId', 'mataPelajaran', 'tugas', 'asasAsat', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'studentId', 'mataPelajaran', 'tugas', 'asasAsat', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && data.studentId is string && isValidId(data.studentId)
+        && data.mataPelajaran is string && data.mataPelajaran.size() >= 1 && data.mataPelajaran.size() <= 100
+        && data.tugas is list && data.tugas.size() == 11
+        && (data.tugas[0] == null || (data.tugas[0] is number && data.tugas[0] >= 0 && data.tugas[0] <= 100))
+        && (data.asasAsat == null || (data.asasAsat is number && data.asasAsat >= 0 && data.asasAsat <= 100))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHoliday(data, holidayId, teacherId) {
+      return data.keys().hasAll(['id', 'ownerId', 'tanggal', 'keterangan', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'tanggal', 'keterangan', 'createdAt', 'updatedAt'])
+        && data.id is string && isValidId(data.id) && data.id == holidayId
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && isValidDateISO(data.tanggal)
+        && data.keterangan is string && data.keterangan.size() >= 1 && data.keterangan.size() <= 200
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /teachers/{teacherId} {
+      allow get: if isValidId(teacherId) && isOwner(teacherId);
+      allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+      allow create: if isValidId(teacherId)
+        && isOwner(teacherId)
+        && isValidTeacherWorkspace(incoming(), teacherId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(teacherId)
+        && isOwner(teacherId)
+        && isValidTeacherWorkspace(incoming(), teacherId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['schoolProfile', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['teacherProfile', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['gradeWeightTugas', 'gradeWeightAsas', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['schoolProfile', 'teacherProfile', 'gradeWeightTugas', 'gradeWeightAsas', 'updatedAt'])
+        );
+      allow delete: if isValidId(teacherId) && isOwner(teacherId);
+
+      match /students/{studentId} {
+        allow get: if isValidId(teacherId) && isValidId(studentId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(studentId)
+          && isOwner(teacherId)
+          && isValidStudent(incoming(), studentId, teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(studentId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidStudent(incoming(), studentId, teacherId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['nis', 'nama', 'kelas', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(studentId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /schedules/{scheduleId} {
+        allow get: if isValidId(teacherId) && isValidId(scheduleId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(scheduleId)
+          && isOwner(teacherId)
+          && isValidSchedule(incoming(), scheduleId, teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(scheduleId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidSchedule(incoming(), scheduleId, teacherId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(scheduleId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /attendance/{attendanceId} {
+        allow get: if isValidId(teacherId) && isValidId(attendanceId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(attendanceId)
+          && isOwner(teacherId)
+          && isValidAttendance(incoming(), teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(attendanceId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidAttendance(incoming(), teacherId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().dateISO == existing().dateISO
+          && incoming().studentId == existing().studentId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(attendanceId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /notes/{noteId} {
+        allow get: if isValidId(teacherId) && isValidId(noteId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(noteId)
+          && isOwner(teacherId)
+          && isValidNote(incoming(), noteId, teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(noteId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidNote(incoming(), noteId, teacherId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['tanggal', 'hari', 'jamKe', 'waktu', 'kelas', 'mataPelajaran', 'materi', 'kegiatan', 'catatan', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(noteId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /grades/{gradeId} {
+        allow get: if isValidId(teacherId) && isValidId(gradeId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(gradeId)
+          && isOwner(teacherId)
+          && isValidGrade(incoming(), teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(gradeId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidGrade(incoming(), teacherId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().studentId == existing().studentId
+          && incoming().mataPelajaran == existing().mataPelajaran
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['tugas', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['asasAsat', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['tugas', 'asasAsat', 'updatedAt'])
+          );
+        allow delete: if isValidId(teacherId) && isValidId(gradeId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /holidays/{holidayId} {
+        allow get: if isValidId(teacherId) && isValidId(holidayId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(holidayId)
+          && isOwner(teacherId)
+          && isValidHoliday(incoming(), holidayId, teacherId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(holidayId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidHoliday(incoming(), holidayId, teacherId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['tanggal', 'keterangan', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(holidayId) && isParentWorkspaceOwner(teacherId);
+      }
+    }
+  }
+}

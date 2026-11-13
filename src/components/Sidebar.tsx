@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { NavTab, SchoolProfile, TeacherProfile } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -22,6 +23,7 @@ interface SidebarProps {
   onLogout: () => void;
   schoolProfile: SchoolProfile;
   teacherProfile: TeacherProfile;
+  cloudEmail?: string | null;
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }
@@ -106,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   schoolProfile,
   teacherProfile,
+  cloudEmail,
   mobileOpen,
   onCloseMobile,
 }) => {
@@ -210,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Teacher Summary & Logout */}
-      <div className="p-4 border-t border-slate-800/80 space-y-3 bg-slate-950/40">
+      <div className="p-4 border-t border-slate-800/80 space-y-2.5 bg-slate-950/40">
         <div className="flex items-center gap-3 min-w-0">
           <img
             src={teacherProfile.fotoProfil}
@@ -223,10 +226,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {teacherProfile.namaGuru}
             </div>
             <div className="text-[11px] font-mono text-slate-400 truncate">
-              NIP {teacherProfile.nip}
+              {cloudEmail || `NIP ${teacherProfile.nip}`}
             </div>
           </div>
         </div>
+
+        <PWAInstallButton variant="sidebar" />
 
         <motion.button
           type="button"
