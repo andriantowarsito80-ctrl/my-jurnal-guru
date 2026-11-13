@@ -4,7 +4,7 @@ import { Download, Smartphone, Share, PlusSquare, X, WifiOff } from 'lucide-reac
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWAInstall';
 
 interface PWAInstallButtonProps {
-  variant?: 'header' | 'sidebar' | 'login';
+  variant?: 'header' | 'sidebar' | 'login' | 'login-dark';
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
@@ -29,6 +29,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   const buttonClass =
     variant === 'sidebar'
       ? 'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-sky-500/20 to-indigo-500/20 border border-sky-400/35 text-xs font-semibold text-sky-200 hover:text-white hover:from-sky-500/35 hover:to-indigo-500/35 transition-colors cursor-pointer'
+      : variant === 'login-dark'
+      ? 'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-200 hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0'
       : variant === 'login'
       ? 'inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100/80 text-xs font-semibold text-blue-800 transition-colors cursor-pointer'
       : 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer';
