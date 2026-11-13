@@ -23,23 +23,44 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [unauthorizedHost, setUnauthorizedHost] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setUnauthorizedHost(null);
     setLoading(true);
     try {
       await onGoogleLogin();
     } catch (err) {
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: unknown }).code || '')
+          : '';
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('popup-closed-by-user')) {
+      const combined = `${code} ${msg}`;
+
+      if (combined.includes('unauthorized-domain')) {
+        const host =
+          typeof window !== 'undefined' ? window.location.hostname : 'domain ini';
+        setUnauthorizedHost(host);
+        setError(
+          `Domain "${host}" belum diizinkan di Firebase Authentication. Tambahkan domain ini ke Authorized domains di Firebase Console agar login Google bisa digunakan.`
+        );
+      } else if (combined.includes('popup-closed-by-user')) {
         setError('Jendela login Google ditutup sebelum selesai. Silakan coba lagi.');
-      } else if (msg.includes('popup-blocked')) {
-        setError('Pop-up diblokir oleh browser. Izinkan pop-up untuk masuk dengan Google.');
-      } else if (msg.includes('network-request-failed')) {
+      } else if (combined.includes('cancelled-popup-request')) {
+        setError('Permintaan login dibatalkan karena ada jendela login lain yang terbuka.');
+      } else if (combined.includes('popup-blocked')) {
+        setError('Pop-up diblokir oleh browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
+      } else if (combined.includes('operation-not-allowed')) {
+        setError('Metode login Google belum diaktifkan pada proyek Firebase Anda.');
+      } else if (combined.includes('network-request-failed')) {
         setError('Koneksi internet sedang tidak stabil. Periksa jaringan Anda lalu coba lagi.');
       } else {
-        setError('Gagal masuk dengan akun Google. Silakan coba beberapa saat lagi.');
+        setError(
+          `Gagal masuk dengan akun Google${code ? ` (${code})` : ''}. Silakan coba beberapa saat lagi.`
+        );
       }
     } finally {
       setLoading(false);
@@ -126,10 +147,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18 }}
                 role="alert"
-                className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 space-y-2"
               >
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
-                <span>{error}</span>
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
+                  <span>{error}</span>
+                </div>
+                {unauthorizedHost && (
+                  <div className="pl-6 text-xs text-red-800 space-y-1">
+                    <p>
+                      Buka <strong>Firebase Console → Authentication → Settings → Authorized domains</strong>, klik <strong>Add domain</strong>, lalu masukkan:
+                    </p>
+                    <div className="font-mono font-semibold bg-white/90 border border-red-200 rounded px-2.5 py-1 text-red-900 select-all inline-block">
+                      {unauthorizedHost}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
