@@ -188,7 +188,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <form
           onSubmit={handleSaveSchool}
-          className="bg-gradient-to-br from-blue-50/80 via-white to-sky-50/70 border border-blue-200 rounded-xl p-6 space-y-4"
+          className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-4"
         >
           <div className="flex items-center gap-2.5 pb-3 border-b border-blue-100">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -295,7 +295,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Profil Guru */}
         <form
           onSubmit={handleSaveTeacher}
-          className="bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/70 border border-indigo-200 rounded-xl p-6 space-y-4"
+          className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-4"
         >
           <div className="flex items-center gap-2.5 pb-3 border-b border-indigo-100">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -415,7 +415,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* 2. Pengaturan Libur Sekolah */}
-      <section className="bg-gradient-to-br from-rose-50/75 via-white to-orange-50/60 border border-rose-200 rounded-xl p-6 space-y-5">
+      <section className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-rose-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -525,7 +525,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <form
           onSubmit={handleSaveWeights}
-          className="bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/70 border border-emerald-200 rounded-xl p-6 space-y-4"
+          className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-4"
         >
           <div className="flex items-center gap-2.5 pb-3 border-b border-emerald-100">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -578,7 +578,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </motion.button>
         </form>
 
-        <div className="bg-gradient-to-br from-amber-50/75 via-white to-orange-50/50 border border-amber-200 rounded-xl p-6 space-y-5">
+        <div className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-5">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5 pb-2 border-b border-amber-100">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs">

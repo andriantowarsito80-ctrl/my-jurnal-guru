@@ -648,7 +648,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
       </div>
 
       {/* 7-Day Week Strip (Senin - Minggu; Sabtu & Minggu kolom berwarna merah) */}
-      <div className="bg-gradient-to-r from-emerald-50/70 via-white to-teal-50/70 border border-emerald-200/80 rounded-xl p-4">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] p-4 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
           <span className="text-xs font-semibold text-slate-600">
             Kalender Mingguan (5 Hari Kerja · Kolom Sabtu & Minggu Libur Merah)
@@ -709,7 +709,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
       </div>
 
       {/* Filter Hari, Tanggal, Kelas & Jadwal Mengajar */}
-      <div className="bg-gradient-to-r from-sky-50/60 via-white to-emerald-50/50 border border-sky-200/80 rounded-xl p-4 space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] p-4 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -919,7 +919,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
               shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }
             }
             transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-            className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm space-y-3"
+            className="rounded-[24px] border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-[0_8px_28px_-18px_rgba(79,70,229,0.2)] space-y-3"
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div className="flex items-start sm:items-center gap-3">

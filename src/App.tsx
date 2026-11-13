@@ -615,7 +615,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen flex bg-slate-50 text-slate-900">
+      <div className="min-h-screen flex bg-[#f2f4f8] text-slate-900">
         <Sidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
@@ -628,101 +628,113 @@ export default function App() {
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Top Workspace Header */}
-          <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Buka menu navigasi"
-                className="lg:hidden p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0">
-                <span className="text-slate-400 font-medium hidden sm:inline whitespace-nowrap">
-                  Administrasi Guru
-                </span>
-                <span className="text-slate-300 hidden sm:inline">/</span>
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeTab}
-                    initial={
-                      shouldReduceMotion ? false : { opacity: 0, y: -4 }
-                    }
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: 4 }}
-                    transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex items-center gap-2 min-w-0"
-                  >
-                    <span
-                      className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${currentTabMeta.badgeStyle}`}
+          {/* Floating Workspace Top Bar */}
+          <header className="sticky top-0 z-20 px-4 sm:px-6 lg:px-8 pt-3.5 pb-1">
+            <div className="max-w-[1440px] mx-auto bg-white/85 backdrop-blur-md border border-slate-200/80 rounded-2xl px-4 sm:px-5 h-14 flex items-center justify-between gap-3 shadow-[0_6px_24px_-16px_rgba(15,23,42,0.12)]">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Buka menu navigasi"
+                  className="lg:hidden p-2 -ml-1 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0">
+                  <span className="text-slate-400 font-medium hidden sm:inline whitespace-nowrap">
+                    Administrasi Guru
+                  </span>
+                  <span className="text-slate-300 hidden sm:inline">/</span>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTab}
+                      initial={
+                        shouldReduceMotion ? false : { opacity: 0, y: -4 }
+                      }
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, y: 4 }}
+                      transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                      className="flex items-center gap-2 min-w-0"
                     >
-                      <CurrentTabIcon className="w-3.5 h-3.5" />
-                    </span>
-                    <span className="font-semibold text-slate-900 truncate">
-                      {currentTabMeta.label}
-                    </span>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 text-xs text-slate-500 shrink-0">
-              <div
-                title={
-                  !isOnline
-                    ? 'Mode Offline: perubahan akan otomatis dikirim saat online'
-                    : syncMeta.hasPendingWrites
-                    ? 'Mengirim perubahan ke cloud...'
-                    : 'Data tersinkron real-time lintas perangkat'
-                }
-                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${
-                  !isOnline
-                    ? 'bg-amber-50 border-amber-200 text-amber-800'
-                    : syncMeta.hasPendingWrites
-                    ? 'bg-sky-50 border-sky-200 text-sky-700'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                }`}
-              >
-                {!isOnline ? (
-                  <>
-                    <CloudOff className="w-3.5 h-3.5 shrink-0" />
-                    <span>Offline</span>
-                  </>
-                ) : syncMeta.hasPendingWrites ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                    <span>Menyinkronkan</span>
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="w-3.5 h-3.5 shrink-0" />
-                    <span>Tersinkron</span>
-                  </>
-                )}
+                      <span
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${currentTabMeta.badgeStyle}`}
+                      >
+                        <CurrentTabIcon className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="font-bold text-slate-900 truncate">
+                        {currentTabMeta.label}
+                      </span>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
               </div>
 
-              <PWAInstallButton variant="header" />
+              <div className="flex items-center gap-2.5 text-xs text-slate-500 shrink-0">
+                <div
+                  title={
+                    !isOnline
+                      ? 'Mode Offline: perubahan akan otomatis dikirim saat online'
+                      : syncMeta.hasPendingWrites
+                      ? 'Mengirim perubahan ke cloud...'
+                      : 'Data tersinkron real-time lintas perangkat'
+                  }
+                  className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-semibold ${
+                    !isOnline
+                      ? 'bg-amber-50 border-amber-200 text-amber-800'
+                      : syncMeta.hasPendingWrites
+                      ? 'bg-sky-50 border-sky-200 text-sky-700'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  }`}
+                >
+                  {!isOnline ? (
+                    <>
+                      <CloudOff className="w-3.5 h-3.5 shrink-0" />
+                      <span>Offline</span>
+                    </>
+                  ) : syncMeta.hasPendingWrites ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      <span>Menyinkronkan</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-3.5 h-3.5 shrink-0" />
+                      <span>Tersinkron</span>
+                    </>
+                  )}
+                </div>
 
-              <span className="hidden xl:inline truncate max-w-[220px]">
-                {state.schoolProfile.namaSekolah}
-              </span>
-              <span className="hidden xl:inline text-slate-300">·</span>
-              <span className="hidden md:inline font-semibold text-slate-700 whitespace-nowrap">
-                {state.teacherProfile.namaGuru}
-              </span>
+                <PWAInstallButton variant="header" />
+
+                <span className="hidden xl:inline truncate max-w-[200px] text-slate-500">
+                  {state.schoolProfile.namaSekolah}
+                </span>
+                <span className="hidden xl:inline text-slate-300">·</span>
+                <div className="hidden md:flex items-center gap-2">
+                  {state.teacherProfile.fotoProfil && (
+                    <img
+                      src={state.teacherProfile.fotoProfil}
+                      alt={state.teacherProfile.namaGuru}
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-full object-cover border border-slate-200"
+                    />
+                  )}
+                  <span className="font-semibold text-slate-800 whitespace-nowrap">
+                    {state.teacherProfile.namaGuru}
+                  </span>
+                </div>
+              </div>
             </div>
           </header>
 
           {cloudError && (
-            <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
+            <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
               Terjadi kendala sinkronisasi cloud: {cloudError}
             </div>
           )}
 
           {/* Main Content Viewport */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:px-8 lg:py-5 max-w-[1440px] w-full mx-auto">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}

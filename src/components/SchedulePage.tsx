@@ -536,8 +536,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       </AnimatePresence>
 
       {/* Filter Bar & Table */}
-      <div className="bg-gradient-to-b from-violet-50/40 via-white to-white border border-violet-200 rounded-xl overflow-hidden">
-        <div className="p-4 bg-gradient-to-r from-violet-50/80 via-purple-50/50 to-white border-b border-violet-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] overflow-hidden">
+        <div className="p-4 bg-gradient-to-r from-violet-50/80 via-purple-50/40 to-white border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <select
               value={filterHari}

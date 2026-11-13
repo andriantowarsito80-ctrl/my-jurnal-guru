@@ -354,7 +354,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
               onSubmit={handleManualSubmit}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-sky-200 rounded-xl shadow-xl"
+              className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-sky-200 rounded-[24px] shadow-2xl"
             >
               <div className="sticky top-0 z-10 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-6 py-4 border-b border-sky-100 flex items-center justify-between gap-4">
                 <div>
@@ -453,8 +453,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
       </AnimatePresence>
 
       {/* Filter Toolbar & Multi-delete */}
-      <div className="bg-gradient-to-b from-sky-50/40 via-white to-white border border-sky-200 rounded-xl overflow-hidden">
-        <div className="p-4 bg-gradient-to-r from-sky-50/80 via-cyan-50/50 to-white border-b border-sky-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] overflow-hidden">
+        <div className="p-4 bg-gradient-to-r from-sky-50/80 via-cyan-50/40 to-white border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 flex-1">
             <div className="relative flex-1 min-w-[220px] max-w-sm">
               <Search className="w-4 h-4 text-sky-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />

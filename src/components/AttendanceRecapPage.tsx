@@ -187,7 +187,7 @@ export const AttendanceRecapPage: React.FC<AttendanceRecapPageProps> = ({
       </div>
 
       {/* Filters & Legend */}
-      <div className="bg-gradient-to-r from-teal-50/80 via-white to-emerald-50/70 border border-teal-200 rounded-xl p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] p-4 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px]">
             <Search className="w-4 h-4 text-teal-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -258,7 +258,7 @@ export const AttendanceRecapPage: React.FC<AttendanceRecapPageProps> = ({
       </div>
 
       {/* Spreadsheet Grid */}
-      <div className="bg-white border border-teal-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] overflow-hidden">
         {filteredStudents.length === 0 ? (
           <div className="py-14 text-center">
             <Table2 className="w-9 h-9 text-slate-300 mx-auto mb-2" />

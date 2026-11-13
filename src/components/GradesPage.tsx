@@ -599,7 +599,7 @@ export const GradesPage: React.FC<GradesPageProps> = ({
       </AnimatePresence>
 
       {/* Filter Bar */}
-      <div className="bg-gradient-to-r from-rose-50/70 via-white to-indigo-50/60 border border-rose-200/80 rounded-xl p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] p-4 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
             {subjects.map((mp) => {

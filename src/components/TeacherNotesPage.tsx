@@ -282,7 +282,7 @@ export const TeacherNotesPage: React.FC<TeacherNotesPageProps> = ({
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
               onSubmit={handleSubmit}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl"
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 rounded-[24px] shadow-2xl"
             >
               <div className="sticky top-0 z-10 bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
                 <div>
@@ -420,7 +420,7 @@ export const TeacherNotesPage: React.FC<TeacherNotesPageProps> = ({
       </AnimatePresence>
 
       {/* Filter Bar */}
-      <div className="bg-gradient-to-r from-amber-50/70 via-white to-orange-50/60 border border-amber-200/80 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/80 rounded-[24px] p-4 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -490,8 +490,8 @@ export const TeacherNotesPage: React.FC<TeacherNotesPageProps> = ({
                   delay: Math.min(idx * 0.04, 0.2),
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-                className={`border rounded-xl p-5 transition-colors ${palette}`}
+                whileHover={shouldReduceMotion ? undefined : { y: -3 }}
+                className={`border rounded-[24px] p-5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] transition-colors ${palette}`}
               >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">

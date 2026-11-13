@@ -1,27 +1,28 @@
 import React, { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
-  Building2,
-  UserCheck,
-  CalendarClock,
   ArrowRight,
-  Users,
+  Award,
   BookOpen,
+  Building2,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
-  NotebookPen,
   Clock,
-  Layers,
-  LayoutDashboard,
+  NotebookPen,
+  Settings,
+  Table2,
+  UserCheck,
+  Users,
 } from 'lucide-react';
+import { AppState, NavTab, WorkingDay } from '../types';
 import {
-  AppState,
-  NavTab,
-  WorkingDay,
-} from '../types';
-import {
+  MONTH_NAMES_ID,
   WORKING_DAYS,
   formatIndonesianDate,
   getDayNameFromISO,
+  getDaysInMonth,
   getHolidayInfo,
   toLocalDateISO,
 } from '../utils/dateUtils';
@@ -29,6 +30,30 @@ import {
 interface DashboardPageProps {
   state: AppState;
   onNavigate: (tab: NavTab) => void;
+}
+
+const AVATAR_GRADIENTS = [
+  'from-sky-400 to-blue-600',
+  'from-violet-400 to-purple-600',
+  'from-emerald-400 to-teal-600',
+  'from-amber-400 to-orange-500',
+  'from-rose-400 to-pink-600',
+];
+
+const NOTE_BADGE_COLORS = [
+  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
+  'bg-amber-100 text-amber-700',
+];
+
+function parseMinutes(waktu: string): number {
+  const match = waktu.match(
+    /(\d{1,2})[:.](\d{2})\s*[-–]\s*(\d{1,2})[:.](\d{2})/
+  );
+  if (!match) return 0;
+  const start = Number(match[1]) * 60 + Number(match[2]);
+  const end = Number(match[3]) * 60 + Number(match[4]);
+  return end > start ? end - start : 0;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -43,8 +68,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     ? (todayDayName as WorkingDay)
     : 'Semua';
 
-  const [selectedDay, setSelectedDay] = useState<WorkingDay | 'Semua'>(initialDay);
+  const [selectedDay, setSelectedDay] = useState<WorkingDay | 'Semua'>(
+    initialDay
+  );
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [focusedDateISO, setFocusedDateISO] = useState(todayISO);
   const shouldReduceMotion = useReducedMotion();
+
+  const { schoolProfile, teacherProfile } = state;
 
   const uniqueClasses = useMemo(
     () => Array.from(new Set(state.students.map((s) => s.kelas))).sort(),
@@ -88,7 +122,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       return {
         sessions: 0,
         totalMinutes: 0,
-        hoursLabel: '0 Jam',
+        hoursLabel: '0j',
         subLabel: holidayInfo.isWeekend
           ? `${todayDayName} · Libur Akhir Pekan`
           : holidayInfo.label || 'Libur Sekolah',
@@ -97,269 +131,583 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
     const todayList = state.schedules.filter((s) => s.hari === todayDayName);
     let totalMinutes = 0;
-
     todayList.forEach((sch) => {
-      const match = sch.waktu.match(
-        /(\d{1,2})[:.](\d{2})\s*[-–]\s*(\d{1,2})[:.](\d{2})/
-      );
-      if (match) {
-        const startMins = Number(match[1]) * 60 + Number(match[2]);
-        const endMins = Number(match[3]) * 60 + Number(match[4]);
-        if (endMins > startMins) {
-          totalMinutes += endMins - startMins;
-        }
-      }
+      totalMinutes += parseMinutes(sch.waktu);
     });
 
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    const hoursLabel =
-      totalMinutes === 0
-        ? '0 Jam'
-        : mins === 0
-        ? `${hours} Jam`
-        : `${hours} Jam ${mins} Menit`;
-
+    const hours = (totalMinutes / 60).toFixed(totalMinutes % 60 === 0 ? 0 : 1);
     return {
       sessions: todayList.length,
       totalMinutes,
-      hoursLabel,
+      hoursLabel: `${hours.replace('.', ',')}j`,
       subLabel:
         todayList.length > 0
-          ? `${todayDayName} · ${todayList.length} sesi mengajar (${totalMinutes} menit)`
-          : `${todayDayName} · Tidak ada jadwal mengajar`,
+          ? `${todayDayName} · ${todayList.length} sesi mengajar`
+          : `${todayDayName} · Tidak ada jadwal`,
     };
   }, [state.schedules, state.holidays, todayISO, todayDayName]);
 
-  const { schoolProfile, teacherProfile } = state;
+  // Weekly 5-day teaching hours breakdown for Bento mini bar chart
+  const weeklyBars = useMemo(() => {
+    const days = WORKING_DAYS.map((day) => {
+      const items = state.schedules.filter((s) => s.hari === day);
+      const mins = items.reduce((acc, item) => acc + parseMinutes(item.waktu), 0);
+      return {
+        day,
+        short: day.slice(0, 3),
+        sessions: items.length,
+        hours: Number((mins / 60).toFixed(1)),
+      };
+    });
+    const maxHours = Math.max(1, ...days.map((d) => d.hours || d.sessions));
+    const totalWeeklyHours = days.reduce((sum, d) => sum + d.hours, 0);
+    return {
+      days,
+      maxHours,
+      totalWeeklyLabel: `${totalWeeklyHours.toFixed(1).replace('.', ',')}j`,
+    };
+  }, [state.schedules]);
 
-  const summaryCards: {
-    label: string;
-    value: string | number;
-    sub: string;
-    tab: NavTab;
-    icon: React.ComponentType<{ className?: string }>;
-    cardBg: string;
-    iconBox: string;
-    labelColor: string;
-    valueColor: string;
-    subColor: string;
-  }[] = [
-    {
-      label: 'Total Siswa Aktif',
-      value: state.students.length,
-      sub: `Tersebar di ${uniqueClasses.length} kelas`,
-      tab: 'siswa',
-      icon: Users,
-      cardBg: 'bg-gradient-to-br from-sky-50 to-cyan-100/80 border-sky-200 hover:border-sky-300',
-      iconBox: 'bg-gradient-to-br from-sky-500 to-cyan-600 text-white shadow-xs',
-      labelColor: 'text-sky-900/80',
-      valueColor: 'text-sky-800',
-      subColor: 'text-sky-800/75',
-    },
-    {
-      label: 'Sesi Mengajar / Minggu',
-      value: state.schedules.length,
-      sub: `${teacherProfile.mataPelajaran.length} mata pelajaran diampu`,
-      tab: 'jadwal',
-      icon: CalendarClock,
-      cardBg: 'bg-gradient-to-br from-violet-50 to-purple-100/80 border-violet-200 hover:border-violet-300',
-      iconBox: 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-xs',
-      labelColor: 'text-violet-900/80',
-      valueColor: 'text-violet-800',
-      subColor: 'text-violet-800/75',
-    },
-    {
-      label: 'Kehadiran Bulan Ini',
-      value: `${monthAttendanceStats.pct}%`,
-      sub: `${monthAttendanceStats.hadir} dari ${monthAttendanceStats.total} presensi hadir`,
-      tab: 'rekap',
-      icon: ClipboardCheck,
-      cardBg: 'bg-gradient-to-br from-emerald-50 to-teal-100/80 border-emerald-200 hover:border-emerald-300',
-      iconBox: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs',
-      labelColor: 'text-emerald-900/80',
-      valueColor: 'text-emerald-700',
-      subColor: 'text-emerald-800/75',
-    },
-    {
-      label: 'Catatan Pembelajaran',
-      value: state.notes.length,
-      sub: 'Jurnal & refleksi guru tersimpan',
-      tab: 'catatan',
-      icon: NotebookPen,
-      cardBg: 'bg-gradient-to-br from-amber-50 to-orange-100/80 border-amber-200 hover:border-amber-300',
-      iconBox: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-xs',
-      labelColor: 'text-amber-900/80',
-      valueColor: 'text-amber-800',
-      subColor: 'text-amber-800/75',
-    },
-  ];
+  // Monthly Mini Calendar grid
+  const calendarGrid = useMemo(() => {
+    const days = getDaysInMonth(calendarMonth.year, calendarMonth.month);
+    const firstDate = new Date(calendarMonth.year, calendarMonth.month, 1);
+    const jsDay = firstDate.getDay(); // 0=Sun..6=Sat
+    const mondayOffset = jsDay === 0 ? 6 : jsDay - 1;
+    const holidaySet = new Set(state.holidays.map((h) => h.tanggal));
+
+    return {
+      leadingEmpty: Array.from({ length: mondayOffset }),
+      days: days.map((d) => ({
+        ...d,
+        isToday: d.dateISO === todayISO,
+        isSelected: d.dateISO === focusedDateISO,
+        isCustomHoliday: holidaySet.has(d.dateISO),
+      })),
+    };
+  }, [calendarMonth, state.holidays, todayISO, focusedDateISO]);
+
+  const focusedDateInfo = useMemo(() => {
+    const holiday = getHolidayInfo(focusedDateISO, state.holidays);
+    const dayName = getDayNameFromISO(focusedDateISO);
+    const count = holiday.isHoliday
+      ? 0
+      : state.schedules.filter((s) => s.hari === dayName).length;
+    return {
+      formatted: formatIndonesianDate(focusedDateISO),
+      status: holiday.isHoliday
+        ? holiday.label || 'Hari Libur'
+        : count > 0
+        ? `${count} sesi mengajar terjadwal`
+        : 'Hari efektif · Tidak ada jadwal',
+      isHoliday: holiday.isHoliday,
+    };
+  }, [focusedDateISO, state.holidays, state.schedules]);
+
+  const latestNotes = useMemo(
+    () =>
+      [...state.notes]
+        .sort((a, b) => b.tanggal.localeCompare(a.tanggal))
+        .slice(0, 3),
+    [state.notes]
+  );
+
+  const shiftMonth = (delta: number) => {
+    setCalendarMonth((prev) => {
+      const next = new Date(prev.year, prev.month + delta, 1);
+      return { year: next.getFullYear(), month: next.getMonth() };
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Page Intro */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="flex items-start gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <LayoutDashboard className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Dashboard Administrasi Guru
+    <div className="space-y-5">
+      {/* BENTO ROW 1: Pastel Hero Welcome Banner + Interactive Mini Calendar */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Pastel Hero Card (Matches V18 Lavender-Indigo Hero) */}
+        <motion.section
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="relative lg:col-span-8 rounded-[26px] border border-indigo-200/70 bg-gradient-to-br from-[#dfe6ff] via-[#ece4ff] to-[#f8e1ff] p-6 sm:p-8 flex flex-col justify-between overflow-hidden shadow-[0_10px_30px_-18px_rgba(79,70,229,0.28)]"
+        >
+          {/* Decorative Soft Pastel Orbs */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-14 -top-14 w-64 h-64 rounded-full bg-gradient-to-br from-white/55 to-fuchsia-200/40 blur-2xl"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-10 -bottom-16 w-52 h-52 rounded-full bg-gradient-to-tr from-sky-200/45 to-indigo-200/35 blur-2xl"
+          />
+
+          <div className="relative z-10 max-w-xl">
+            <p className="text-xs font-semibold text-indigo-900/75 mb-2">
+              {schoolProfile.namaSekolah} · {formatIndonesianDate(todayISO)}
+            </p>
+            <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-slate-900 tracking-tight leading-tight [text-wrap:balance]">
+              Kelola Kelas Lebih Terpadu Hari Ini
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {formatIndonesianDate(todayISO)} · Tahun Ajaran Aktif · Sekolah 5 Hari Kerja
+            <p className="mt-2.5 text-sm text-slate-700/90 leading-relaxed max-w-lg">
+              Selamat datang, <strong className="text-slate-900">{teacherProfile.namaGuru}</strong>. Pantau absensi suara, jadwal 5 hari kerja, catatan pembelajaran, dan nilai rapot siswa secara real-time.
             </p>
           </div>
-        </div>
+
+          <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+              onClick={() => onNavigate('absen')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#16171d] hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+              <span>Mulai Absen Siswa</span>
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+              onClick={() => onNavigate('siswa')}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/80 hover:bg-white border border-indigo-200/80 text-slate-800 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <span>Database Siswa</span>
+              <ArrowRight className="w-3.5 h-3.5 text-indigo-600" />
+            </motion.button>
+          </div>
+        </motion.section>
+
+        {/* Interactive Mini Calendar Card */}
+        <motion.section
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="lg:col-span-4 rounded-[26px] bg-white border border-slate-200/80 p-5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.12)] flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="text-sm font-bold text-slate-900">
+                {MONTH_NAMES_ID[calendarMonth.month]} {calendarMonth.year}
+              </h2>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(-1)}
+                  aria-label="Bulan sebelumnya"
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(1)}
+                  aria-label="Bulan berikutnya"
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-400 mb-1.5">
+              <span>Sen</span>
+              <span>Sel</span>
+              <span>Rab</span>
+              <span>Kam</span>
+              <span>Jum</span>
+              <span>Sab</span>
+              <span>Min</span>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-xs tabular-nums">
+              {calendarGrid.leadingEmpty.map((_, i) => (
+                <span key={`empty-${i}`} className="h-7" />
+              ))}
+              {calendarGrid.days.map((d) => {
+                const isHoliday = d.isWeekend || d.isCustomHoliday;
+                return (
+                  <button
+                    key={d.dateISO}
+                    type="button"
+                    onClick={() => setFocusedDateISO(d.dateISO)}
+                    className={`h-7 w-7 mx-auto rounded-full flex items-center justify-center font-medium transition-colors cursor-pointer ${
+                      d.isToday
+                        ? 'bg-[#16171d] text-white font-bold shadow-xs'
+                        : d.isSelected
+                        ? 'bg-indigo-100 text-indigo-800 font-bold'
+                        : isHoliday
+                        ? 'text-rose-500/80 hover:bg-rose-50'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {d.day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px]">
+            <span className="font-semibold text-slate-700 truncate">
+              {focusedDateInfo.formatted}
+            </span>
+            <span
+              className={`shrink-0 font-medium ${
+                focusedDateInfo.isHoliday ? 'text-rose-600' : 'text-indigo-600'
+              }`}
+            >
+              {focusedDateInfo.status}
+            </span>
+          </div>
+        </motion.section>
+      </div>
+
+      {/* BENTO ROW 2: 3-Column Visual Metric & Activity Row (Matches V18 Middle Row) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+        {/* Card 1: Siswa & Kelas Aktif (Overlapping Avatar Stack) */}
         <motion.button
           type="button"
-          whileHover={shouldReduceMotion ? undefined : { y: -1 }}
-          whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-          onClick={() => onNavigate('pengaturan')}
-          className="px-4 py-2 rounded-lg border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-xs font-semibold text-indigo-700 transition-colors whitespace-nowrap shrink-0 self-start sm:self-auto cursor-pointer"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.26, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={shouldReduceMotion ? undefined : { y: -4 }}
+          whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
+          onClick={() => onNavigate('siswa')}
+          className="lg:col-span-4 text-left rounded-[26px] bg-white border border-slate-200/80 p-5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.1)] hover:border-sky-300 transition-colors cursor-pointer flex flex-col justify-between"
         >
-          Kelola Profil & Libur Sekolah
-        </motion.button>
-      </div>
-
-      {/* Quick Stats Card */}
-      <section
-        aria-label="Quick Stats"
-        className="bg-gradient-to-br from-blue-50/80 via-white to-emerald-50/70 border border-blue-200/80 rounded-xl p-5 shadow-2xs"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-blue-100/80">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Quick Stats</h2>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Ringkasan cepat jumlah siswa, kelas aktif, dan total jam mengajar hari ini ({todayDayName})
-            </p>
-          </div>
-          <span className="text-xs font-mono font-semibold text-blue-700 tabular-nums">
-            {formatIndonesianDate(todayISO)}
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div
-            whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-            transition={{ duration: 0.16 }}
-            className="rounded-xl bg-gradient-to-br from-sky-50 to-blue-100/70 border border-sky-200 p-4 flex items-start justify-between gap-3"
-          >
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold text-sky-900/80">
-                Total Siswa
-              </div>
-              <div className="mt-1.5 text-3xl font-bold text-sky-950 font-mono tabular-nums">
+              <h3 className="text-sm font-bold text-slate-900">Siswa Aktif</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tersebar di {uniqueClasses.length} rombongan belajar
+              </p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+              <ChevronRight className="w-4 h-4" />
+            </span>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <div className="flex -space-x-2.5 overflow-hidden">
+              {state.students.slice(0, 5).map((st, idx) => (
+                <span
+                  key={st.id}
+                  title={st.nama}
+                  className={`w-9 h-9 rounded-full bg-gradient-to-br ${
+                    AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length]
+                  } text-white text-xs font-bold flex items-center justify-center ring-2 ring-white shadow-xs`}
+                >
+                  {st.nama.charAt(0).toUpperCase()}
+                </span>
+              ))}
+              {state.students.length > 5 && (
+                <span className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center ring-2 ring-white tabular-nums">
+                  +{state.students.length - 5}
+                </span>
+              )}
+            </div>
+
+            <div className="text-right">
+              <div className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
                 {state.students.length}
               </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('siswa')}
-                className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:text-sky-900 cursor-pointer"
-              >
-                <span>Lihat Database Siswa</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
+              <div className="text-[11px] font-medium text-sky-700">
+                Total Siswa
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Users className="w-4.5 h-4.5" />
-            </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-            transition={{ duration: 0.16 }}
-            className="rounded-xl bg-gradient-to-br from-violet-50 to-indigo-100/70 border border-violet-200 p-4 flex items-start justify-between gap-3"
-          >
+          <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 truncate">
+            {uniqueClasses.length > 0
+              ? `Kelas: ${uniqueClasses.join(' · ')}`
+              : 'Belum ada kelas terdaftar'}
+          </div>
+        </motion.button>
+
+        {/* Card 2: Jam Mengajar & Grafik Mingguan (Matches 9,2h Bar Chart Card) */}
+        <motion.button
+          type="button"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.26, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={shouldReduceMotion ? undefined : { y: -4 }}
+          whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
+          onClick={() => onNavigate('jadwal')}
+          className="lg:col-span-4 text-left rounded-[26px] bg-white border border-slate-200/80 p-5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.1)] hover:border-amber-300 transition-colors cursor-pointer flex flex-col justify-between"
+        >
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold text-violet-900/80">
-                Jumlah Kelas
-              </div>
-              <div className="mt-1.5 text-3xl font-bold text-violet-950 font-mono tabular-nums">
-                {uniqueClasses.length}
-              </div>
-              <div className="mt-1.5 text-xs text-violet-800/80 truncate max-w-[240px]">
-                {uniqueClasses.length > 0
-                  ? uniqueClasses.join(', ')
-                  : 'Belum ada kelas terdaftar'}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Layers className="w-4.5 h-4.5" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-            transition={{ duration: 0.16 }}
-            className="rounded-xl bg-gradient-to-br from-emerald-50 to-teal-100/70 border border-emerald-200 p-4 flex items-start justify-between gap-3"
-          >
-            <div>
-              <div className="text-xs font-semibold text-emerald-900/80">
-                Total Jam Mengajar Hari Ini
-              </div>
-              <div className="mt-1.5 text-3xl font-bold text-emerald-800 font-mono tabular-nums">
-                {todayScheduleStats.hoursLabel}
-              </div>
-              <div className="mt-1.5 text-xs text-emerald-800/80">
-                {todayScheduleStats.subLabel}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Clock className="w-4.5 h-4.5" />
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* 4-Column Interactive Summary Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <motion.button
-              key={card.label}
-              type="button"
-              initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.2,
-                delay: i * 0.04,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              whileHover={shouldReduceMotion ? undefined : { y: -3 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-              onClick={() => onNavigate(card.tab)}
-              className={`text-left border rounded-xl p-4 transition-colors cursor-pointer ${card.cardBg}`}
-            >
-              <div className={`flex items-center justify-between text-xs font-semibold ${card.labelColor}`}>
-                <span>{card.label}</span>
-                <span
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center ${card.iconBox}`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
+              <p className="text-xs font-semibold text-slate-500">
+                Jam Mengajar Hari Ini
+              </p>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-slate-900 font-mono tabular-nums">
+                  {todayScheduleStats.hoursLabel}
+                </span>
+                <span className="text-xs font-medium text-slate-500 tabular-nums">
+                  / {weeklyBars.totalWeeklyLabel} minggu
                 </span>
               </div>
-              <div
-                className={`mt-2 text-2xl font-bold tabular-nums font-mono ${card.valueColor}`}
+            </div>
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock className="w-4 h-4" />
+            </span>
+          </div>
+
+          {/* Mini Vertical Bar Chart (Sen - Jum) */}
+          <div className="mt-4 grid grid-cols-5 gap-2.5 items-end h-20 pt-2">
+            {weeklyBars.days.map((d) => {
+              const metric = d.hours || d.sessions;
+              const pct = Math.max(14, Math.round((metric / weeklyBars.maxHours) * 100));
+              const isToday = d.day === todayDayName;
+              return (
+                <div
+                  key={d.day}
+                  className="flex flex-col items-center gap-1.5 h-full justify-end"
+                  title={`${d.day}: ${d.sessions} sesi (${d.hours} jam)`}
+                >
+                  <div className="w-full flex-1 flex items-end justify-center">
+                    <div
+                      style={{ height: `${pct}%` }}
+                      className={`w-full max-w-[26px] rounded-t-lg transition-all ${
+                        isToday
+                          ? 'bg-gradient-to-t from-orange-500 to-amber-400 shadow-xs'
+                          : metric > 0
+                          ? 'bg-amber-200/85'
+                          : 'bg-slate-100'
+                      }`}
+                    />
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold ${
+                      isToday ? 'text-orange-600' : 'text-slate-400'
+                    }`}
+                  >
+                    {d.short}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 truncate">
+            {todayScheduleStats.subLabel}
+          </div>
+        </motion.button>
+
+        {/* Card 3: Catatan Pembelajaran Terbaru (Matches Notifications Card) */}
+        <motion.div
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.26, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={shouldReduceMotion ? undefined : { y: -4 }}
+          className="md:col-span-2 lg:col-span-4 rounded-[26px] bg-white border border-slate-200/80 p-5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.1)] flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-bold text-slate-900">
+              Catatan Guru Terbaru
+            </h3>
+            <button
+              type="button"
+              onClick={() => onNavigate('catatan')}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>Semua ({state.notes.length})</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          {latestNotes.length === 0 ? (
+            <div className="py-6 text-center">
+              <p className="text-xs text-slate-500">
+                Belum ada catatan pembelajaran tersimpan.
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigate('catatan')}
+                className="mt-2.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
-                {card.value}
-              </div>
-              <div className={`mt-1 text-xs ${card.subColor}`}>{card.sub}</div>
-            </motion.button>
-          );
-        })}
+                + Tambah Catatan Pertama
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {latestNotes.map((note, idx) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={() => onNavigate('catatan')}
+                  className="w-full text-left flex items-center gap-3 p-2 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      NOTE_BADGE_COLORS[idx % NOTE_BADGE_COLORS.length]
+                    }`}
+                  >
+                    <NotebookPen className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold text-slate-900 truncate">
+                      {note.materi}
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate">
+                      {note.kelas} · {note.mataPelajaran}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400 tabular-nums shrink-0">
+                    {note.tanggal.slice(5)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </motion.div>
       </div>
 
-      {/* 2 Profiles Grid: Profil Sekolah & Profil Guru */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+      {/* BENTO ROW 3: Kehadiran & Modul Cepat + Dark Obsidian Spotlight Card (Matches V18 Bottom Row) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Left: Attendance + Quick Jump Module Tiles */}
+        <motion.section
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.26, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="lg:col-span-7 rounded-[26px] bg-white border border-slate-200/80 p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.1)] flex flex-col justify-between"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Ringkasan Kinerja & Akses Modul
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Metrik presensi bulan berjalan serta pintasan modul rekap dan rapot
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div>
+                <div className="text-2xl font-bold text-emerald-700 font-mono tabular-nums">
+                  {monthAttendanceStats.pct}%
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Hadir ({monthAttendanceStats.hadir}/{monthAttendanceStats.total})
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-indigo-700 font-mono tabular-nums">
+                  {state.schedules.length}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Sesi / Minggu
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -3 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              onClick={() => onNavigate('rekap')}
+              className="text-left rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/70 border border-emerald-200/80 p-4 flex items-center justify-between gap-3 cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Table2 className="w-4.5 h-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900 truncate">
+                    Rekap Kehadiran
+                  </div>
+                  <div className="text-xs text-emerald-800/80 truncate">
+                    Matriks bulanan & ekspor PDF/Excel
+                  </div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-emerald-700 shrink-0" />
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -3 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              onClick={() => onNavigate('nilai')}
+              className="text-left rounded-2xl bg-gradient-to-br from-rose-50 to-pink-100/70 border border-rose-200/80 p-4 flex items-center justify-between gap-3 cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Award className="w-4.5 h-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900 truncate">
+                    Daftar Nilai Rapot
+                  </div>
+                  <div className="text-xs text-rose-800/80 truncate">
+                    11 kolom tugas, ASAS/ASAT & rapor
+                  </div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-rose-700 shrink-0" />
+            </motion.button>
+          </div>
+        </motion.section>
+
+        {/* Right: Dark Glowing Violet-Obsidian Spotlight Card (Matches "Unleash Your Potential") */}
+        <motion.section
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.26, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          className="relative lg:col-span-5 rounded-[26px] bg-gradient-to-br from-[#16171d] via-[#211a3d] to-[#341b58] text-white p-6 shadow-[0_18px_45px_-20px_rgba(49,27,88,0.65)] overflow-hidden flex flex-col justify-between"
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-10 -bottom-10 w-44 h-44 rounded-full bg-violet-500/25 blur-2xl"
+          />
+
+          <div className="relative z-10">
+            <p className="text-xs font-medium text-violet-300">
+              NPSN {schoolProfile.npsn} · Akreditasi {schoolProfile.statusAkreditasi}
+            </p>
+            <h2 className="mt-1.5 text-xl font-bold tracking-tight text-white [text-wrap:balance]">
+              Sinkronisasi Cloud & Pengaturan
+            </h2>
+            <p className="mt-2 text-xs text-slate-300 leading-relaxed">
+              Atur identitas sekolah, biodata pendidik ({teacherProfile.mataPelajaran.length} mata pelajaran), kalender hari libur nasional, dan bobot nilai rapot.
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-5 flex flex-wrap items-center gap-2.5">
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+              onClick={() => onNavigate('pengaturan')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-violet-50 text-xs font-bold shadow-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Settings className="w-3.5 h-3.5 text-indigo-700" />
+              <span>Kelola Profil & Libur</span>
+            </motion.button>
+            <motion.button
+              type="button"
+              whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+              onClick={() => onNavigate('jadwal')}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <CalendarClock className="w-3.5 h-3.5 text-violet-300" />
+              <span>Jadwal Mengajar</span>
+            </motion.button>
+          </div>
+        </motion.section>
+      </div>
+
+      {/* BENTO ROW 4: Profil Sekolah & Profil Guru */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
         {/* Profil Sekolah */}
-        <section className="bg-gradient-to-br from-blue-50/85 via-white to-sky-50/75 border border-blue-200 rounded-xl p-6 flex flex-col justify-between">
+        <section className="bg-white border border-slate-200/80 rounded-[26px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between gap-3 pb-4 border-b border-blue-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Building2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -376,7 +724,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </span>
             </div>
 
-            <dl className="mt-5 divide-y divide-slate-100 text-sm">
+            <dl className="mt-4 divide-y divide-slate-100 text-sm">
               <div className="py-3 grid grid-cols-1 sm:grid-cols-3 gap-1">
                 <dt className="text-slate-500 font-medium">Nama Sekolah</dt>
                 <dd className="sm:col-span-2 font-semibold text-slate-900">
@@ -387,12 +735,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <dt className="text-slate-500 font-medium">NPSN</dt>
                 <dd className="sm:col-span-2 font-mono font-semibold text-slate-900 tabular-nums">
                   {schoolProfile.npsn}
-                </dd>
-              </div>
-              <div className="py-3 grid grid-cols-1 sm:grid-cols-3 gap-1">
-                <dt className="text-slate-500 font-medium">Status Akreditasi</dt>
-                <dd className="sm:col-span-2 font-semibold text-slate-900">
-                  {schoolProfile.statusAkreditasi}
                 </dd>
               </div>
               <div className="py-3 grid grid-cols-1 sm:grid-cols-3 gap-1">
@@ -414,11 +756,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </section>
 
         {/* Profil Guru */}
-        <section className="bg-gradient-to-br from-indigo-50/85 via-white to-violet-50/75 border border-indigo-200 rounded-xl p-6 flex flex-col justify-between">
+        <section className="bg-white border border-slate-200/80 rounded-[26px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between gap-3 pb-4 border-b border-indigo-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div>
@@ -432,11 +774,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
             </div>
 
-            <div className="mt-5 flex flex-col sm:flex-row gap-5 items-start">
+            <div className="mt-4 flex flex-col sm:flex-row gap-5 items-start">
               <motion.div
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.03 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden border-2 border-indigo-200 bg-slate-100 shrink-0 flex items-center justify-center shadow-xs"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-indigo-200 bg-slate-100 shrink-0 flex items-center justify-center shadow-xs"
               >
                 {teacherProfile.fotoProfil ? (
                   <img
@@ -452,7 +794,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 )}
               </motion.div>
 
-              <dl className="flex-1 w-full divide-y divide-indigo-100/70 text-sm">
+              <dl className="flex-1 w-full divide-y divide-slate-100 text-sm">
                 <div className="pb-2.5 grid grid-cols-1 sm:grid-cols-3 gap-1">
                   <dt className="text-slate-500 font-medium">Nama Guru</dt>
                   <dd className="sm:col-span-2 font-bold text-slate-900">
@@ -492,8 +834,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </section>
       </div>
 
-      {/* Informasi Jadwal Mengajar */}
-      <section className="bg-gradient-to-br from-teal-50/60 via-white to-blue-50/40 border border-teal-200/80 rounded-xl p-6">
+      {/* BENTO ROW 5: Informasi Jadwal Mengajar */}
+      <section className="bg-white border border-slate-200/80 rounded-[26px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
@@ -505,7 +847,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
               {(['Semua', ...WORKING_DAYS] as const).map((day) => {
                 const isSelected = selectedDay === day;
                 return (
@@ -513,7 +855,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     key={day}
                     type="button"
                     onClick={() => setSelectedDay(day)}
-                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       isSelected
                         ? 'text-white'
                         : 'text-slate-600 hover:text-slate-900'
@@ -532,7 +874,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                 mass: 0.6,
                               }
                         }
-                        className="absolute inset-0 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 shadow-xs"
+                        className="absolute inset-0 rounded-lg bg-[#16171d] shadow-xs"
                         aria-hidden="true"
                       />
                     )}
@@ -549,7 +891,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               whileHover={shouldReduceMotion ? undefined : { x: 2 }}
               whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
               onClick={() => onNavigate('jadwal')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 hover:text-blue-800 whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-indigo-700 hover:text-indigo-800 whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span>Kelola Jadwal</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -584,7 +926,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 {filteredSchedules.map((sch) => (
                   <tr
                     key={sch.id}
-                    className="hover:bg-blue-50/40 transition-colors"
+                    className="hover:bg-indigo-50/40 transition-colors"
                   >
                     <td className="py-3 pr-4 font-semibold text-slate-900 whitespace-nowrap">
                       {sch.hari}
