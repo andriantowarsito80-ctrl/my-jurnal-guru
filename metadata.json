@@ -1,0 +1,6 @@
+{
+  "name": "Administrasi Guru - SMAN 1 Majalaya Karawang",
+  "description": "Aplikasi Administrasi Guru SMA Negeri 1 Majalaya Kabupaten Karawang: Database Siswa, Jadwal Mengajar, Absen & Rekap Kehadiran, Catatan Guru, dan Daftar Nilai.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
