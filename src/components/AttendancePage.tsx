@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   CheckCheck,
@@ -13,6 +13,11 @@ import {
   Volume2,
   VolumeX,
   ClipboardCheck,
+  Megaphone,
+  SkipBack,
+  SkipForward,
+  RotateCcw,
+  Square,
 } from 'lucide-react';
 import {
   AttendanceMap,
@@ -155,8 +160,20 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
     }
   );
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [rollCallActive, setRollCallActive] = useState<boolean>(false);
+  const [callingStudentId, setCallingStudentId] = useState<string | null>(null);
+  const [autoAdvanceRollCall, setAutoAdvanceRollCall] = useState<boolean>(true);
+  const [onlyUnmarkedRollCall, setOnlyUnmarkedRollCall] = useState<boolean>(false);
+
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const autoAdvanceTimerRef = useRef<number | null>(null);
+  const rollCallActiveRef = useRef<boolean>(false);
   const webSpeechAvailable = useMemo(() => isWebSpeechSupported(), []);
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    rollCallActiveRef.current = rollCallActive;
+  }, [rollCallActive]);
 
   useEffect(() => {
     if (!webSpeechAvailable) return;
@@ -196,6 +213,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
 
   useEffect(() => {
     return () => {
+      if (autoAdvanceTimerRef.current) {
+        window.clearTimeout(autoAdvanceTimerRef.current);
+      }
       stopSpeaking();
     };
   }, []);
@@ -208,9 +228,40 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
     return () => window.clearTimeout(timer);
   }, [attendanceFeedback]);
 
+  const clearAutoAdvanceTimer = () => {
+    if (autoAdvanceTimerRef.current) {
+      window.clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+  };
+
+  const callStudentName = (student: Student) => {
+    clearAutoAdvanceTimer();
+    if (!voiceEnabled) {
+      setVoiceEnabled(true);
+    }
+    setCallingStudentId(student.id);
+    rowRefs.current[student.id]?.scrollIntoView({
+      behavior: shouldReduceMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+    });
+
+    const promptText = `${student.nama}, hadirkah hari ini?`;
+    void speakAttendancePhrase({
+      text: promptText,
+      style:
+        'Warm, clear, friendly Indonesian school teacher calling attendance in class',
+      mode: voiceMode,
+      webSpeechVoiceURI: selectedWebSpeechURI || undefined,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+    });
+  };
+
   const triggerAttendanceMessage = (
     status: AttendanceStatus,
-    studentName: string
+    studentName: string,
+    onAfterSpeech?: () => void
   ) => {
     const messages: Record<
       AttendanceStatus,
@@ -250,14 +301,35 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
     });
 
     if (voiceEnabled) {
+      let finished = false;
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        setIsSpeaking(false);
+        onAfterSpeech?.();
+      };
+      if (onAfterSpeech) {
+        clearAutoAdvanceTimer();
+        autoAdvanceTimerRef.current = window.setTimeout(done, 3200);
+      }
       void speakAttendancePhrase({
         text: msg.spoken,
         style: msg.style,
         mode: voiceMode,
         webSpeechVoiceURI: selectedWebSpeechURI || undefined,
         onStart: () => setIsSpeaking(true),
-        onEnd: () => setIsSpeaking(false),
+        onEnd: () => {
+          clearAutoAdvanceTimer();
+          if (onAfterSpeech) {
+            autoAdvanceTimerRef.current = window.setTimeout(done, 320);
+          } else {
+            done();
+          }
+        },
       });
+    } else if (onAfterSpeech) {
+      clearAutoAdvanceTimer();
+      autoAdvanceTimerRef.current = window.setTimeout(onAfterSpeech, 650);
     }
   };
 
@@ -310,6 +382,120 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
     });
     return { hadir, izin, sakit, alpa };
   }, [filteredStudents, attendance, selectedDate]);
+
+  const rollCallList = useMemo(() => {
+    if (!onlyUnmarkedRollCall) return filteredStudents;
+    const unmarked = filteredStudents.filter(
+      (st) => !attendance[`${selectedDate}::${st.id}`]
+    );
+    return unmarked.length > 0 ? unmarked : filteredStudents;
+  }, [filteredStudents, onlyUnmarkedRollCall, attendance, selectedDate]);
+
+  const currentCallingStudent = useMemo(
+    () =>
+      filteredStudents.find((s) => s.id === callingStudentId) ||
+      rollCallList[0] ||
+      null,
+    [filteredStudents, rollCallList, callingStudentId]
+  );
+
+  const currentCallingIndex = useMemo(() => {
+    if (!currentCallingStudent) return -1;
+    return filteredStudents.findIndex((s) => s.id === currentCallingStudent.id);
+  }, [filteredStudents, currentCallingStudent]);
+
+  const stopRollCall = () => {
+    clearAutoAdvanceTimer();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setRollCallActive(false);
+    setCallingStudentId(null);
+  };
+
+  const startRollCall = () => {
+    if (holidayInfo.isHoliday || filteredStudents.length === 0) return;
+    const first =
+      filteredStudents.find((st) => !attendance[`${selectedDate}::${st.id}`]) ||
+      filteredStudents[0];
+    if (!first) return;
+    setRollCallActive(true);
+    rollCallActiveRef.current = true;
+    callStudentName(first);
+  };
+
+  const stepRollCall = (direction: 1 | -1, fromStudentId?: string) => {
+    if (filteredStudents.length === 0) return;
+    const anchorId = fromStudentId || callingStudentId;
+    const idx = anchorId
+      ? filteredStudents.findIndex((s) => s.id === anchorId)
+      : -1;
+    let nextStudent: Student | undefined;
+
+    if (direction === 1) {
+      if (onlyUnmarkedRollCall) {
+        nextStudent =
+          filteredStudents
+            .slice(idx + 1)
+            .find((st) => !attendance[`${selectedDate}::${st.id}`]) ||
+          filteredStudents.find(
+            (st) =>
+              st.id !== anchorId && !attendance[`${selectedDate}::${st.id}`]
+          );
+      } else {
+        nextStudent = filteredStudents[idx + 1];
+      }
+      if (!nextStudent) {
+        setRollCallActive(false);
+        setCallingStudentId(null);
+        setAttendanceFeedback({
+          id: Date.now(),
+          status: 'Hadir',
+          title: 'Pemanggilan absen selesai!',
+          subtitle: 'Seluruh siswa pada daftar kelas ini telah dipanggil.',
+        });
+        if (voiceEnabled) {
+          void speakAttendancePhrase({
+            text: 'Pemanggilan absen selesai. Terima kasih anak-anak!',
+            style: 'Warm, cheerful Indonesian school teacher voice',
+            mode: voiceMode,
+            webSpeechVoiceURI: selectedWebSpeechURI || undefined,
+            onStart: () => setIsSpeaking(true),
+            onEnd: () => setIsSpeaking(false),
+          });
+        }
+        return;
+      }
+    } else {
+      const prevIdx = idx <= 0 ? 0 : idx - 1;
+      nextStudent = filteredStudents[prevIdx];
+    }
+
+    if (nextStudent) {
+      callStudentName(nextStudent);
+    }
+  };
+
+  const handleMarkStudentAttendance = (
+    st: Student,
+    status: AttendanceStatus
+  ) => {
+    onSetAttendance(selectedDate, st.id, status);
+    const shouldAutoNext =
+      rollCallActiveRef.current &&
+      autoAdvanceRollCall &&
+      callingStudentId === st.id;
+
+    triggerAttendanceMessage(
+      status,
+      st.nama,
+      shouldAutoNext
+        ? () => {
+            if (!rollCallActiveRef.current) return;
+            stepRollCall(1, st.id);
+          }
+        : undefined
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -402,6 +588,36 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
             type="button"
             disabled={holidayInfo.isHoliday || filteredStudents.length === 0}
             onClick={() => {
+              if (rollCallActive) {
+                stopRollCall();
+              } else {
+                startRollCall();
+              }
+            }}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed ${
+              rollCallActive
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-xs'
+            }`}
+          >
+            {rollCallActive ? (
+              <>
+                <Square className="w-3.5 h-3.5" />
+                <span>Hentikan Panggil</span>
+              </>
+            ) : (
+              <>
+                <Megaphone className="w-4 h-4" />
+                <span>Panggil Absen</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            disabled={holidayInfo.isHoliday || filteredStudents.length === 0}
+            onClick={() => {
+              if (rollCallActive) stopRollCall();
               onMarkAllPresent(
                 selectedDate,
                 filteredStudents.map((s) => s.id)
@@ -691,6 +907,142 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
         </motion.div>
       </div>
 
+      {/* Guided Roll-Call Panel */}
+      <AnimatePresence>
+        {rollCallActive && currentCallingStudent && !holidayInfo.isHoliday && (
+          <motion.div
+            initial={
+              shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.99 }
+            }
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={
+              shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }
+            }
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm space-y-3"
+          >
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-indigo-700 font-mono tabular-nums">
+                      Siswa {currentCallingIndex + 1} / {filteredStudents.length}
+                    </span>
+                    <span className="text-xs text-slate-400">·</span>
+                    <span className="text-xs font-semibold text-slate-600">
+                      Kelas {currentCallingStudent.kelas}
+                    </span>
+                  </div>
+                  <div className="text-base font-bold text-slate-900 mt-0.5">
+                    “{currentCallingStudent.nama}, hadirkah hari ini?”
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => stepRollCall(-1)}
+                  disabled={currentCallingIndex <= 0}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 text-xs font-semibold text-slate-700 cursor-pointer"
+                  title="Siswa sebelumnya"
+                >
+                  <SkipBack className="w-3.5 h-3.5" />
+                  <span>Sebelumnya</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => callStudentName(currentCallingStudent)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold text-indigo-700 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Panggil Ulang</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => stepRollCall(1)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                >
+                  <span>Berikutnya</span>
+                  <SkipForward className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={stopRollCall}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-xs font-semibold text-rose-700 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Selesai</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2.5 border-t border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600 mr-1">
+                  Tandai cepat:
+                </span>
+                {STATUS_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const isCurrent =
+                    attendance[`${selectedDate}::${currentCallingStudent.id}`] ===
+                    opt.value;
+                  return (
+                    <motion.button
+                      key={`rc-${opt.value}`}
+                      type="button"
+                      whileTap={shouldReduceMotion ? undefined : { scale: 0.94 }}
+                      onClick={() =>
+                        handleMarkStudentAttendance(
+                          currentCallingStudent,
+                          opt.value
+                        )
+                      }
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        isCurrent
+                          ? `${opt.activeBg} text-white shadow-xs`
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{opt.short}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-700">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoAdvanceRollCall}
+                    onChange={(e) => setAutoAdvanceRollCall(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 cursor-pointer"
+                  />
+                  <span>Otomatis panggil siswa berikutnya</span>
+                </label>
+
+                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={onlyUnmarkedRollCall}
+                    onChange={(e) => setOnlyUnmarkedRollCall(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 cursor-pointer"
+                  />
+                  <span>Lewati yang sudah diabsen</span>
+                </label>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Attendance Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         {filteredStudents.length === 0 ? (
@@ -725,8 +1077,19 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.map((st, idx) => {
                   const currentStatus = attendance[`${selectedDate}::${st.id}`];
+                  const isBeingCalled = callingStudentId === st.id;
                   return (
-                    <tr key={st.id} className="hover:bg-slate-50/70">
+                    <tr
+                      key={st.id}
+                      ref={(el) => {
+                        rowRefs.current[st.id] = el;
+                      }}
+                      className={`transition-colors ${
+                        isBeingCalled
+                          ? 'bg-indigo-50/90'
+                          : 'hover:bg-slate-50/70'
+                      }`}
+                    >
                       <td className="py-2.5 px-4 font-mono text-xs text-slate-500 tabular-nums">
                         {idx + 1}
                       </td>
@@ -734,7 +1097,28 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
                         {st.nis}
                       </td>
                       <td className="py-2.5 px-4 font-semibold text-slate-900">
-                        {st.nama}
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{st.nama}</span>
+                          {!holidayInfo.isHoliday && (
+                            <motion.button
+                              type="button"
+                              whileTap={
+                                shouldReduceMotion ? undefined : { scale: 0.92 }
+                              }
+                              onClick={() => callStudentName(st)}
+                              title={`Panggil ${st.nama}: "${st.nama}, hadirkah hari ini?"`}
+                              aria-label={`Panggil nama ${st.nama}`}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border transition-colors shrink-0 cursor-pointer ${
+                                isBeingCalled
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                  : 'bg-indigo-50/70 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                              }`}
+                            >
+                              <Volume2 className="w-3 h-3" />
+                              <span>Panggil</span>
+                            </motion.button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-4 text-slate-700 whitespace-nowrap">
                         {st.kelas}
@@ -769,12 +1153,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({
                                       key: clickKey,
                                       nonce: Date.now(),
                                     });
-                                    onSetAttendance(
-                                      selectedDate,
-                                      st.id,
-                                      opt.value
-                                    );
-                                    triggerAttendanceMessage(opt.value, st.nama);
+                                    handleMarkStudentAttendance(st, opt.value);
                                   }}
                                   className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                                     isActive
