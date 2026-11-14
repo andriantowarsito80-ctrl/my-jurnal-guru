@@ -14,10 +14,13 @@ import {
   Sliders,
   ShieldCheck,
   Cloud,
+  FolderArchive,
+  CalendarPlus,
 } from 'lucide-react';
 import {
   AppState,
   SchoolProfile,
+  SemesterType,
   TeacherProfile,
 } from '../types';
 import { formatIndonesianDate } from '../utils/dateUtils';
@@ -27,8 +30,11 @@ import { PWAInstallButton } from './PWAInstallButton';
 interface SettingsPageProps {
   state: AppState;
   cloudUserEmail?: string | null;
+  archivesCount?: number;
   onUpdateSchoolProfile: (profile: SchoolProfile) => void;
   onUpdateTeacherProfile: (profile: TeacherProfile) => void;
+  onUpdateAcademicYear?: (tahunAjaran: string, semester: SemesterType) => void;
+  onOpenAcademicYearModal?: (tab?: 'archives' | 'new-year') => void;
   onAddHoliday: (tanggal: string, keterangan: string) => void;
   onDeleteHoliday: (id: string) => void;
   onUpdateWeights: (tugas: number, asas: number) => void;
@@ -38,8 +44,11 @@ interface SettingsPageProps {
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   state,
   cloudUserEmail,
+  archivesCount = 0,
   onUpdateSchoolProfile,
   onUpdateTeacherProfile,
+  onUpdateAcademicYear,
+  onOpenAcademicYearModal,
   onAddHoliday,
   onDeleteHoliday,
   onUpdateWeights,
@@ -60,11 +69,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const [weightTugas, setWeightTugas] = useState(state.gradeWeightTugas);
   const [weightAsas, setWeightAsas] = useState(state.gradeWeightAsas);
+  const [yearInput, setYearInput] = useState(state.activeAcademicYear);
+  const [semesterInput, setSemesterInput] = useState<SemesterType>(
+    state.activeSemester
+  );
 
   const [confirmReset, setConfirmReset] = useState(false);
 
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    setYearInput(state.activeAcademicYear);
+    setSemesterInput(state.activeSemester);
+  }, [state.activeAcademicYear, state.activeSemester]);
 
   useEffect(() => {
     setSchoolForm(state.schoolProfile);
@@ -183,6 +201,94 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 0. Manajemen Tahun Ajaran & Arsip Data Lama */}
+      <section className="bg-white border border-slate-200/80 rounded-[24px] p-6 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.08)] space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-violet-100">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <FolderArchive className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Tahun Ajaran & Arsip Data Terdahulu
+              </h2>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Simpan data tahun ajaran lama secara permanen saat pindah tahun ajaran atau pergantian jadwal mengajar, sehingga tetap bisa dibuka kembali.
+              </p>
+            </div>
+          </div>
+
+          {onOpenAcademicYearModal && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => onOpenAcademicYearModal('archives')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-800 text-xs font-bold cursor-pointer"
+              >
+                <FolderArchive className="w-3.5 h-3.5" />
+                <span>Buka Arsip ({archivesCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAcademicYearModal('new-year')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                <span>Mulai Tahun Ajaran Baru</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {onUpdateAcademicYear && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!yearInput.trim()) return;
+              onUpdateAcademicYear(yearInput.trim(), semesterInput);
+              showToast('Label Tahun Ajaran & Semester aktif berhasil diperbarui.');
+            }}
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
+          >
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Tahun Ajaran Aktif
+              </label>
+              <input
+                type="text"
+                value={yearInput}
+                onChange={(e) => setYearInput(e.target.value)}
+                placeholder="Contoh: 2025/2026"
+                className="w-full h-10 px-3 rounded-lg border border-violet-200 bg-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Semester Aktif
+              </label>
+              <select
+                value={semesterInput}
+                onChange={(e) => setSemesterInput(e.target.value as SemesterType)}
+                className="w-full h-10 px-3 rounded-lg border border-violet-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+              >
+                <option value="Ganjil">Semester Ganjil</option>
+                <option value="Genap">Semester Genap</option>
+              </select>
+            </div>
+            <div>
+              <button
+                type="submit"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Simpan Label Tahun</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
 
       {/* 1. Pengaturan Profil Sekolah & Profil Guru */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

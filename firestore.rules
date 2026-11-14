@@ -36,6 +36,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
     }
 
+    function isParentArchiveOwner(teacherId, yearId) {
+      return isOwner(teacherId)
+        && get(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId)).data.ownerId == request.auth.uid;
+    }
+
     function isValidDateISO(val) {
       return val is string && val.size() == 10 && val.matches('^\\d{4}-\\d{2}-\\d{2}$');
     }
@@ -79,6 +84,8 @@ service cloud.firestore {
           'teacherProfile',
           'gradeWeightTugas',
           'gradeWeightAsas',
+          'activeAcademicYear',
+          'activeSemester',
           'createdAt',
           'updatedAt'
         ])
@@ -89,6 +96,8 @@ service cloud.firestore {
         && isValidTeacherProfile(data.teacherProfile)
         && data.gradeWeightTugas is number && data.gradeWeightTugas >= 0 && data.gradeWeightTugas <= 100
         && data.gradeWeightAsas is number && data.gradeWeightAsas >= 0 && data.gradeWeightAsas <= 100
+        && (!('activeAcademicYear' in data) || (data.activeAcademicYear is string && data.activeAcademicYear.size() >= 1 && data.activeAcademicYear.size() <= 40))
+        && (!('activeSemester' in data) || (data.activeSemester in ['Ganjil', 'Genap']))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -172,6 +181,64 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidSummaryStats(stats) {
+      return stats is map
+        && stats.keys().hasAll(['studentCount', 'scheduleCount', 'attendanceCount', 'noteCount', 'gradeCount'])
+        && stats.keys().hasOnly(['studentCount', 'scheduleCount', 'attendanceCount', 'noteCount', 'gradeCount', 'holidayCount'])
+        && stats.studentCount is number && stats.studentCount >= 0 && stats.studentCount <= 10000
+        && stats.scheduleCount is number && stats.scheduleCount >= 0 && stats.scheduleCount <= 1000
+        && stats.attendanceCount is number && stats.attendanceCount >= 0 && stats.attendanceCount <= 100000
+        && stats.noteCount is number && stats.noteCount >= 0 && stats.noteCount <= 10000
+        && stats.gradeCount is number && stats.gradeCount >= 0 && stats.gradeCount <= 20000
+        && (!('holidayCount' in stats) || (stats.holidayCount is number && stats.holidayCount >= 0 && stats.holidayCount <= 1000));
+    }
+
+    function isValidAcademicYearArchive(data, yearId, teacherId) {
+      return data.keys().hasAll([
+          'id',
+          'ownerId',
+          'label',
+          'tahunAjaran',
+          'semester',
+          'schoolProfile',
+          'teacherProfile',
+          'gradeWeightTugas',
+          'gradeWeightAsas',
+          'summaryStats',
+          'archivedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'ownerId',
+          'label',
+          'tahunAjaran',
+          'semester',
+          'schoolProfile',
+          'teacherProfile',
+          'gradeWeightTugas',
+          'gradeWeightAsas',
+          'summaryStats',
+          'archivedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.id is string && isValidId(data.id) && data.id == yearId
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == teacherId
+        && data.label is string && data.label.size() >= 1 && data.label.size() <= 120
+        && data.tahunAjaran is string && data.tahunAjaran.size() >= 1 && data.tahunAjaran.size() <= 40
+        && data.semester in ['Ganjil', 'Genap']
+        && isValidSchoolProfile(data.schoolProfile)
+        && isValidTeacherProfile(data.teacherProfile)
+        && data.gradeWeightTugas is number && data.gradeWeightTugas >= 0 && data.gradeWeightTugas <= 100
+        && data.gradeWeightAsas is number && data.gradeWeightAsas >= 0 && data.gradeWeightAsas <= 100
+        && isValidSummaryStats(data.summaryStats)
+        && data.archivedAt is timestamp
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     match /teachers/{teacherId} {
       allow get: if isValidId(teacherId) && isOwner(teacherId);
       allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
@@ -190,7 +257,10 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['schoolProfile', 'updatedAt'])
           || incoming().diff(existing()).affectedKeys().hasOnly(['teacherProfile', 'updatedAt'])
           || incoming().diff(existing()).affectedKeys().hasOnly(['gradeWeightTugas', 'gradeWeightAsas', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['activeAcademicYear', 'activeSemester', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['activeAcademicYear', 'activeSemester', 'teacherProfile', 'updatedAt'])
           || incoming().diff(existing()).affectedKeys().hasOnly(['schoolProfile', 'teacherProfile', 'gradeWeightTugas', 'gradeWeightAsas', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['schoolProfile', 'teacherProfile', 'gradeWeightTugas', 'gradeWeightAsas', 'activeAcademicYear', 'activeSemester', 'updatedAt'])
         );
       allow delete: if isValidId(teacherId) && isOwner(teacherId);
 
@@ -318,6 +388,100 @@ service cloud.firestore {
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['tanggal', 'keterangan', 'updatedAt']);
         allow delete: if isValidId(teacherId) && isValidId(holidayId) && isParentWorkspaceOwner(teacherId);
+      }
+
+      match /academicYears/{yearId} {
+        allow get: if isValidId(teacherId) && isValidId(yearId) && isParentWorkspaceOwner(teacherId);
+        allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId) && isValidId(yearId)
+          && isOwner(teacherId)
+          && isValidAcademicYearArchive(incoming(), yearId, teacherId)
+          && incoming().archivedAt == request.time
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId));
+        allow update: if isValidId(teacherId) && isValidId(yearId)
+          && isParentWorkspaceOwner(teacherId)
+          && isValidAcademicYearArchive(incoming(), yearId, teacherId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().archivedAt == existing().archivedAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['label', 'updatedAt']);
+        allow delete: if isValidId(teacherId) && isValidId(yearId) && isParentWorkspaceOwner(teacherId);
+
+        match /students/{studentId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(studentId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(studentId)
+            && isOwner(teacherId)
+            && isValidStudent(incoming(), studentId, teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(studentId) && isParentArchiveOwner(teacherId, yearId);
+        }
+
+        match /schedules/{scheduleId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(scheduleId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(scheduleId)
+            && isOwner(teacherId)
+            && isValidSchedule(incoming(), scheduleId, teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(scheduleId) && isParentArchiveOwner(teacherId, yearId);
+        }
+
+        match /attendance/{attendanceId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(attendanceId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(attendanceId)
+            && isOwner(teacherId)
+            && isValidAttendance(incoming(), teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(attendanceId) && isParentArchiveOwner(teacherId, yearId);
+        }
+
+        match /notes/{noteId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(noteId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(noteId)
+            && isOwner(teacherId)
+            && isValidNote(incoming(), noteId, teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(noteId) && isParentArchiveOwner(teacherId, yearId);
+        }
+
+        match /grades/{gradeId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(gradeId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(gradeId)
+            && isOwner(teacherId)
+            && isValidGrade(incoming(), teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(gradeId) && isParentArchiveOwner(teacherId, yearId);
+        }
+
+        match /holidays/{holidayId} {
+          allow get: if isValidId(teacherId) && isValidId(yearId) && isValidId(holidayId) && isParentArchiveOwner(teacherId, yearId);
+          allow list: if isOwner(teacherId) && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(teacherId) && isValidId(yearId) && isValidId(holidayId)
+            && isOwner(teacherId)
+            && isValidHoliday(incoming(), holidayId, teacherId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/teachers/$(teacherId)/academicYears/$(yearId));
+          allow delete: if isValidId(teacherId) && isValidId(yearId) && isValidId(holidayId) && isParentArchiveOwner(teacherId, yearId);
+        }
       }
     }
   }

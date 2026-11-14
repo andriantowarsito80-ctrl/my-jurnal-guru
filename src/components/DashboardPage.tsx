@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
+  FolderArchive,
   NotebookPen,
   Settings,
   Table2,
@@ -30,6 +31,8 @@ import {
 interface DashboardPageProps {
   state: AppState;
   onNavigate: (tab: NavTab) => void;
+  archivesCount?: number;
+  onOpenAcademicYearModal?: (tab?: 'archives' | 'new-year') => void;
 }
 
 const AVATAR_GRADIENTS = [
@@ -59,6 +62,8 @@ function parseMinutes(waktu: string): number {
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   state,
   onNavigate,
+  archivesCount = 0,
+  onOpenAcademicYearModal,
 }) => {
   const todayISO = toLocalDateISO(new Date());
   const todayDayName = getDayNameFromISO(todayISO);
@@ -665,36 +670,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           <div className="relative z-10">
             <p className="text-xs font-medium text-violet-300">
-              NPSN {schoolProfile.npsn} · Akreditasi {schoolProfile.statusAkreditasi}
+              TA {state.activeAcademicYear} · Semester {state.activeSemester} · NPSN {schoolProfile.npsn}
             </p>
             <h2 className="mt-1.5 text-xl font-bold tracking-tight text-white [text-wrap:balance]">
-              Sinkronisasi Cloud & Pengaturan
+              Arsip Tahun Ajaran & Pengaturan
             </h2>
             <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-              Atur identitas sekolah, biodata pendidik ({teacherProfile.mataPelajaran.length} mata pelajaran), kalender hari libur nasional, dan bobot nilai rapot.
+              Berganti tahun ajaran atau jadwal mengajar? Data lama otomatis diarsipkan ({archivesCount} arsip tersimpan) agar tetap bisa dibuka & diekspor kapan saja.
             </p>
           </div>
 
           <div className="relative z-10 mt-5 flex flex-wrap items-center gap-2.5">
+            {onOpenAcademicYearModal && (
+              <motion.button
+                type="button"
+                whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                onClick={() => onOpenAcademicYearModal('archives')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-violet-50 text-xs font-bold shadow-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <FolderArchive className="w-3.5 h-3.5 text-indigo-700" />
+                <span>Tahun Ajaran & Arsip ({archivesCount})</span>
+              </motion.button>
+            )}
             <motion.button
               type="button"
               whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
               whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
               onClick={() => onNavigate('pengaturan')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-violet-50 text-xs font-bold shadow-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <Settings className="w-3.5 h-3.5 text-indigo-700" />
-              <span>Kelola Profil & Libur</span>
-            </motion.button>
-            <motion.button
-              type="button"
-              whileHover={shouldReduceMotion ? undefined : { y: -1.5 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-              onClick={() => onNavigate('jadwal')}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
-              <CalendarClock className="w-3.5 h-3.5 text-violet-300" />
-              <span>Jadwal Mengajar</span>
+              <Settings className="w-3.5 h-3.5 text-violet-300" />
+              <span>Pengaturan</span>
             </motion.button>
           </div>
         </motion.section>

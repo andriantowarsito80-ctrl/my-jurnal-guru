@@ -1,7 +1,7 @@
 # Security Specification — Administrasi Guru Cloud Sync
 
 ## 1. Data Invariants
-1. Every workspace document (`/teachers/{teacherId}`) and all subcollection records (`students`, `schedules`, `attendance`, `notes`, `grades`, `holidays`) belong strictly to a single verified Google-authenticated user (`request.auth.uid == teacherId` and `request.auth.token.email_verified == true`).
+1. Every workspace document (`/teachers/{teacherId}`), active subcollection records (`students`, `schedules`, `attendance`, `notes`, `grades`, `holidays`), and historical academic year archives (`/teachers/{teacherId}/academicYears/{yearId}` and their nested subcollections) belong strictly to a single verified Google-authenticated user (`request.auth.uid == teacherId` and `request.auth.token.email_verified == true`).
 2. `ownerId` and `createdAt` are immutable after document creation.
 3. All `createdAt` and `updatedAt` timestamps must equal `request.time` (server timestamp).
 4. Subcollection records cannot exist without their parent `/teachers/{teacherId}` document (`exists(...)` on `create`), and single-document reads/updates/deletes verify parent ownership via `get()`.

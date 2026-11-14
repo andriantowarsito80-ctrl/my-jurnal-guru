@@ -80,6 +80,8 @@ export function createInitialAppState(): AppState {
   const todayISO = toLocalDateISO(now);
 
   return {
+    activeAcademicYear: '2025/2026',
+    activeSemester: 'Genap',
     schoolProfile: {
       namaSekolah: 'SMA Negeri 1 Majalaya Kabupaten Karawang',
       npsn: '6995810',

@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
+  AcademicYearArchiveMeta,
   AppState,
   AttendanceMap,
   AttendanceStatus,
@@ -22,6 +23,8 @@ import {
   HolidayItem,
   ScheduleItem,
   SchoolProfile,
+  SemesterType,
+  StartNewAcademicYearParams,
   Student,
   StudentGradeRecord,
   TeacherNote,
@@ -101,12 +104,38 @@ async function commitBatchedWrites(
   }
 }
 
-async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
+function getSubcollectionDocRef(
+  uid: string,
+  subcollection: string,
+  docId: string,
+  archiveYearId?: string
+) {
+  return archiveYearId
+    ? doc(db, 'teachers', uid, 'academicYears', archiveYearId, subcollection, docId)
+    : doc(db, 'teachers', uid, subcollection, docId);
+}
+
+async function seedSubcollections(
+  uid: string,
+  seed: AppState,
+  archiveYearId?: string
+): Promise<void> {
   const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+  const validDays = new Set([
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ]);
+  const validWorkingDays = new Set(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
+  const validStatuses = new Set(['Hadir', 'Izin', 'Sakit', 'Alpa']);
 
   seed.students.forEach((st) => {
     const id = sanitizeId(st.id);
-    const ref = doc(db, 'teachers', uid, 'students', id);
+    const ref = getSubcollectionDocRef(uid, 'students', id, archiveYearId);
     ops.push((batch) =>
       batch.set(ref, {
         id,
@@ -122,12 +151,13 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
 
   seed.schedules.forEach((sch) => {
     const id = sanitizeId(sch.id);
-    const ref = doc(db, 'teachers', uid, 'schedules', id);
+    const ref = getSubcollectionDocRef(uid, 'schedules', id, archiveYearId);
+    const hari = validWorkingDays.has(sch.hari) ? sch.hari : 'Senin';
     ops.push((batch) =>
       batch.set(ref, {
         id,
         ownerId: uid,
-        hari: sch.hari,
+        hari,
         jamKe: clampString(sch.jamKe, 20, '1'),
         waktu: clampString(sch.waktu, 30, '07:00 - 08:30'),
         kelas: clampString(sch.kelas, 40, '-'),
@@ -140,9 +170,10 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
 
   Object.entries(seed.attendance).forEach(([key, status]) => {
     const [dateISO, studentId] = key.split('::');
-    if (!dateISO || !studentId) return;
+    if (!dateISO || !studentId || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) return;
+    if (!validStatuses.has(status)) return;
     const docId = attendanceDocId(dateISO, studentId);
-    const ref = doc(db, 'teachers', uid, 'attendance', docId);
+    const ref = getSubcollectionDocRef(uid, 'attendance', docId, archiveYearId);
     ops.push((batch) =>
       batch.set(ref, {
         ownerId: uid,
@@ -157,13 +188,17 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
 
   seed.notes.forEach((note) => {
     const id = sanitizeId(note.id);
-    const ref = doc(db, 'teachers', uid, 'notes', id);
+    const ref = getSubcollectionDocRef(uid, 'notes', id, archiveYearId);
+    const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(note.tanggal)
+      ? note.tanggal
+      : '2026-01-01';
+    const hari = validDays.has(note.hari) ? note.hari : 'Senin';
     ops.push((batch) =>
       batch.set(ref, {
         id,
         ownerId: uid,
-        tanggal: clampString(note.tanggal, 10),
-        hari: note.hari,
+        tanggal,
+        hari,
         jamKe: clampString(note.jamKe, 20),
         waktu: clampString(note.waktu, 30),
         kelas: clampString(note.kelas, 40, '-'),
@@ -179,7 +214,7 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
 
   Object.values(seed.grades).forEach((rec) => {
     const docId = gradeDocId(rec.studentId, rec.mataPelajaran);
-    const ref = doc(db, 'teachers', uid, 'grades', docId);
+    const ref = getSubcollectionDocRef(uid, 'grades', docId, archiveYearId);
     const tugas = Array.from({ length: 11 }, (_, idx) => {
       const val = rec.tugas[idx];
       return typeof val === 'number' && !Number.isNaN(val)
@@ -204,8 +239,9 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
   });
 
   seed.holidays.forEach((hol) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(hol.tanggal)) return;
     const id = sanitizeId(hol.id);
-    const ref = doc(db, 'teachers', uid, 'holidays', id);
+    const ref = getSubcollectionDocRef(uid, 'holidays', id, archiveYearId);
     ops.push((batch) =>
       batch.set(ref, {
         id,
@@ -218,7 +254,10 @@ async function seedSubcollections(uid: string, seed: AppState): Promise<void> {
     );
   });
 
-  await commitBatchedWrites(ops, `teachers/${uid}/seed`);
+  const ctx = archiveYearId
+    ? `teachers/${uid}/academicYears/${archiveYearId}/seed`
+    : `teachers/${uid}/seed`;
+  await commitBatchedWrites(ops, ctx);
 }
 
 export async function ensureTeacherWorkspace(
@@ -258,6 +297,13 @@ export async function ensureTeacherWorkspace(
         0,
         Math.min(100, Number(initialSeed.gradeWeightAsas) || 50)
       ),
+      activeAcademicYear: clampString(
+        initialSeed.activeAcademicYear,
+        40,
+        '2025/2026'
+      ),
+      activeSemester:
+        initialSeed.activeSemester === 'Ganjil' ? 'Ganjil' : 'Genap',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -270,6 +316,8 @@ export async function ensureTeacherWorkspace(
 
 export interface WorkspaceSyncCallbacks {
   onWorkspaceMeta: (meta: {
+    activeAcademicYear: string;
+    activeSemester: SemesterType;
     schoolProfile: SchoolProfile;
     teacherProfile: TeacherProfile;
     gradeWeightTugas: number;
@@ -304,6 +352,15 @@ export function subscribeTeacherWorkspace(
         const data = snapshot.data();
         if (data.schoolProfile && data.teacherProfile) {
           callbacks.onWorkspaceMeta({
+            activeAcademicYear:
+              typeof data.activeAcademicYear === 'string' &&
+              data.activeAcademicYear.trim()
+                ? data.activeAcademicYear
+                : '2025/2026',
+            activeSemester:
+              data.activeSemester === 'Ganjil' || data.activeSemester === 'Genap'
+                ? data.activeSemester
+                : 'Genap',
             schoolProfile: data.schoolProfile as SchoolProfile,
             teacherProfile: data.teacherProfile as TeacherProfile,
             gradeWeightTugas:
@@ -963,6 +1020,8 @@ export async function resetWorkspaceInFirestore(
       }),
       gradeWeightTugas: fresh.gradeWeightTugas,
       gradeWeightAsas: fresh.gradeWeightAsas,
+      activeAcademicYear: clampString(fresh.activeAcademicYear, 40, '2025/2026'),
+      activeSemester: fresh.activeSemester === 'Ganjil' ? 'Ganjil' : 'Genap',
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
@@ -970,4 +1029,354 @@ export async function resetWorkspaceInFirestore(
   }
 
   await seedSubcollections(uid, fresh);
+}
+
+// ============================================================
+// Multi-Academic-Year & Historical Archive Sync Functions
+// ============================================================
+
+export async function updateAcademicYearMetaDoc(
+  uid: string,
+  activeAcademicYear: string,
+  activeSemester: SemesterType
+): Promise<void> {
+  const path = `teachers/${uid}`;
+  try {
+    await updateDoc(doc(db, 'teachers', uid), {
+      activeAcademicYear: clampString(activeAcademicYear, 40, '2025/2026'),
+      activeSemester: activeSemester === 'Ganjil' ? 'Ganjil' : 'Genap',
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export function subscribeAcademicYearArchives(
+  uid: string,
+  callback: (archives: AcademicYearArchiveMeta[]) => void
+): Unsubscribe {
+  const archivesPath = `teachers/${uid}/academicYears`;
+  return onSnapshot(
+    query(collection(db, 'teachers', uid, 'academicYears'), where('ownerId', '==', uid)),
+    (snapshot) => {
+      const list: AcademicYearArchiveMeta[] = snapshot.docs
+        .map((d) => {
+          const data = d.data();
+          const archivedAtDate =
+            data.archivedAt && typeof data.archivedAt.toDate === 'function'
+              ? data.archivedAt.toDate()
+              : new Date();
+          return {
+            id: d.id,
+            label: String(data.label ?? data.tahunAjaran ?? d.id),
+            tahunAjaran: String(data.tahunAjaran ?? '2025/2026'),
+            semester: (data.semester === 'Ganjil' ? 'Ganjil' : 'Genap') as SemesterType,
+            schoolProfile: data.schoolProfile as SchoolProfile,
+            teacherProfile: data.teacherProfile as TeacherProfile,
+            gradeWeightTugas:
+              typeof data.gradeWeightTugas === 'number' ? data.gradeWeightTugas : 50,
+            gradeWeightAsas:
+              typeof data.gradeWeightAsas === 'number' ? data.gradeWeightAsas : 50,
+            summaryStats: {
+              studentCount: Number(data.summaryStats?.studentCount ?? 0),
+              scheduleCount: Number(data.summaryStats?.scheduleCount ?? 0),
+              attendanceCount: Number(data.summaryStats?.attendanceCount ?? 0),
+              noteCount: Number(data.summaryStats?.noteCount ?? 0),
+              gradeCount: Number(data.summaryStats?.gradeCount ?? 0),
+              holidayCount: Number(data.summaryStats?.holidayCount ?? 0),
+            },
+            archivedAtISO: archivedAtDate.toISOString(),
+          };
+        })
+        .sort((a, b) => b.archivedAtISO.localeCompare(a.archivedAtISO));
+      callback(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, archivesPath);
+    }
+  );
+}
+
+export async function archiveCurrentWorkspaceYear(
+  uid: string,
+  currentState: AppState,
+  label: string,
+  tahunAjaran?: string,
+  semester?: SemesterType
+): Promise<string> {
+  const safeTahun = clampString(
+    tahunAjaran || currentState.activeAcademicYear,
+    40,
+    '2025/2026'
+  );
+  const safeSemester: SemesterType =
+    (semester || currentState.activeSemester) === 'Ganjil' ? 'Ganjil' : 'Genap';
+  const safeLabel = clampString(
+    label,
+    120,
+    `TA ${safeTahun} (${safeSemester})`
+  );
+  const yearId = sanitizeId(
+    `ta-${safeTahun}-${safeSemester}-${Date.now()}`
+  );
+  const archivePath = `teachers/${uid}/academicYears/${yearId}`;
+
+  try {
+    await setDoc(doc(db, 'teachers', uid, 'academicYears', yearId), {
+      id: yearId,
+      ownerId: uid,
+      label: safeLabel,
+      tahunAjaran: safeTahun,
+      semester: safeSemester,
+      schoolProfile: sanitizeSchoolProfile(currentState.schoolProfile),
+      teacherProfile: sanitizeTeacherProfile(currentState.teacherProfile),
+      gradeWeightTugas: Math.max(
+        0,
+        Math.min(100, Number(currentState.gradeWeightTugas) || 50)
+      ),
+      gradeWeightAsas: Math.max(
+        0,
+        Math.min(100, Number(currentState.gradeWeightAsas) || 50)
+      ),
+      summaryStats: {
+        studentCount: currentState.students.length,
+        scheduleCount: currentState.schedules.length,
+        attendanceCount: Object.keys(currentState.attendance).length,
+        noteCount: currentState.notes.length,
+        gradeCount: Object.keys(currentState.grades).length,
+        holidayCount: currentState.holidays.length,
+      },
+      archivedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, archivePath);
+  }
+
+  await seedSubcollections(uid, currentState, yearId);
+  return yearId;
+}
+
+export async function loadArchiveWorkspaceData(
+  uid: string,
+  meta: AcademicYearArchiveMeta
+): Promise<AppState> {
+  const yearId = sanitizeId(meta.id);
+
+  const readSub = async (sub: string) => {
+    const colPath = `teachers/${uid}/academicYears/${yearId}/${sub}`;
+    try {
+      return await getDocs(
+        query(
+          collection(db, 'teachers', uid, 'academicYears', yearId, sub),
+          where('ownerId', '==', uid)
+        )
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+      return null;
+    }
+  };
+
+  const [studentsSnap, schedulesSnap, attendanceSnap, notesSnap, gradesSnap, holidaysSnap] =
+    await Promise.all([
+      readSub('students'),
+      readSub('schedules'),
+      readSub('attendance'),
+      readSub('notes'),
+      readSub('grades'),
+      readSub('holidays'),
+    ]);
+
+  const students: Student[] =
+    studentsSnap?.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        nis: String(data.nis ?? ''),
+        nama: String(data.nama ?? ''),
+        kelas: String(data.kelas ?? ''),
+      };
+    }) ?? [];
+
+  const schedules: ScheduleItem[] =
+    schedulesSnap?.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        hari: data.hari,
+        jamKe: String(data.jamKe ?? ''),
+        waktu: String(data.waktu ?? ''),
+        kelas: String(data.kelas ?? ''),
+        mataPelajaran: String(data.mataPelajaran ?? ''),
+      };
+    }) ?? [];
+
+  const attendance: AttendanceMap = {};
+  attendanceSnap?.docs.forEach((d) => {
+    const data = d.data();
+    if (data.dateISO && data.studentId && data.status) {
+      attendance[`${data.dateISO}::${data.studentId}`] =
+        data.status as AttendanceStatus;
+    }
+  });
+
+  const notes: TeacherNote[] = (
+    notesSnap?.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        tanggal: String(data.tanggal ?? ''),
+        hari: data.hari,
+        jamKe: String(data.jamKe ?? ''),
+        waktu: String(data.waktu ?? ''),
+        kelas: String(data.kelas ?? ''),
+        mataPelajaran: String(data.mataPelajaran ?? ''),
+        materi: String(data.materi ?? ''),
+        kegiatan: String(data.kegiatan ?? ''),
+        catatan: String(data.catatan ?? ''),
+      };
+    }) ?? []
+  ).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+
+  const grades: GradesMap = {};
+  gradesSnap?.docs.forEach((d) => {
+    const data = d.data();
+    if (data.studentId && data.mataPelajaran) {
+      grades[`${data.studentId}::${data.mataPelajaran}`] = {
+        studentId: String(data.studentId),
+        mataPelajaran: String(data.mataPelajaran),
+        tugas: Array.isArray(data.tugas)
+          ? data.tugas.slice(0, 11)
+          : Array(11).fill(null),
+        asasAsat: typeof data.asasAsat === 'number' ? data.asasAsat : null,
+      };
+    }
+  });
+
+  const holidays: HolidayItem[] =
+    holidaysSnap?.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        tanggal: String(data.tanggal ?? ''),
+        keterangan: String(data.keterangan ?? ''),
+      };
+    }) ?? [];
+
+  return {
+    activeAcademicYear: meta.tahunAjaran,
+    activeSemester: meta.semester,
+    schoolProfile: meta.schoolProfile,
+    teacherProfile: meta.teacherProfile,
+    students,
+    schedules,
+    attendance,
+    notes,
+    grades,
+    holidays,
+    credentials: { username: 'admin', password: '' },
+    gradeWeightTugas: meta.gradeWeightTugas,
+    gradeWeightAsas: meta.gradeWeightAsas,
+  };
+}
+
+export async function deleteArchiveYear(uid: string, yearId: string): Promise<void> {
+  const safeYearId = sanitizeId(yearId);
+  const subcollections = [
+    'students',
+    'schedules',
+    'attendance',
+    'notes',
+    'grades',
+    'holidays',
+  ] as const;
+
+  const deleteOps: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+  for (const sub of subcollections) {
+    const colPath = `teachers/${uid}/academicYears/${safeYearId}/${sub}`;
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, 'teachers', uid, 'academicYears', safeYearId, sub),
+          where('ownerId', '==', uid)
+        )
+      );
+      snap.docs.forEach((d) => {
+        deleteOps.push((batch) => batch.delete(d.ref));
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+    }
+  }
+  await commitBatchedWrites(
+    deleteOps,
+    `teachers/${uid}/academicYears/${safeYearId}/delete`
+  );
+
+  const archivePath = `teachers/${uid}/academicYears/${safeYearId}`;
+  try {
+    await deleteDoc(doc(db, 'teachers', uid, 'academicYears', safeYearId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, archivePath);
+  }
+}
+
+export async function startNewAcademicYear(
+  uid: string,
+  currentState: AppState,
+  params: StartNewAcademicYearParams
+): Promise<string> {
+  // 1. Archive 100% of current active year data first before touching active workspace
+  const archiveId = await archiveCurrentWorkspaceYear(
+    uid,
+    currentState,
+    params.archiveCurrentLabel,
+    currentState.activeAcademicYear,
+    currentState.activeSemester
+  );
+
+  // 2. Determine which active subcollections to clear for the new academic year
+  const subsToClear: Array<
+    'students' | 'schedules' | 'attendance' | 'notes' | 'grades'
+  > = ['attendance', 'notes', 'grades'];
+  if (params.studentMode === 'clear') subsToClear.push('students');
+  if (params.scheduleMode === 'clear') subsToClear.push('schedules');
+
+  const deleteOps: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+  for (const sub of subsToClear) {
+    const colPath = `teachers/${uid}/${sub}`;
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'teachers', uid, sub), where('ownerId', '==', uid))
+      );
+      snap.docs.forEach((d) => {
+        deleteOps.push((batch) => batch.delete(d.ref));
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+    }
+  }
+  await commitBatchedWrites(deleteOps, `teachers/${uid}/new-academic-year`);
+
+  // 3. Update active academic year, semester, and updated subjects on workspace doc
+  const nextTeacherProfile = sanitizeTeacherProfile({
+    ...currentState.teacherProfile,
+    mataPelajaran: params.newSubjects,
+  });
+
+  try {
+    await updateDoc(doc(db, 'teachers', uid), {
+      activeAcademicYear: clampString(params.newTahunAjaran, 40, '2026/2027'),
+      activeSemester: params.newSemester === 'Ganjil' ? 'Ganjil' : 'Genap',
+      teacherProfile: nextTeacherProfile,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `teachers/${uid}`);
+  }
+
+  return archiveId;
 }

@@ -27,6 +27,17 @@
           "type": "number",
           "description": "Percentage weight (0-100) for ASAS/ASAT exam score."
         },
+        "activeAcademicYear": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Currently active academic year label (e.g., 2025/2026)."
+        },
+        "activeSemester": {
+          "type": "string",
+          "enum": ["Ganjil", "Genap"],
+          "description": "Currently active semester."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -42,6 +53,82 @@
         "teacherProfile",
         "gradeWeightTugas",
         "gradeWeightAsas",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AcademicYearArchive": {
+      "title": "AcademicYearArchive",
+      "description": "Immutable/historical snapshot metadata for an archived academic year and semester.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "tahunAjaran": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "semester": {
+          "type": "string",
+          "enum": ["Ganjil", "Genap"]
+        },
+        "schoolProfile": {
+          "type": "object"
+        },
+        "teacherProfile": {
+          "type": "object"
+        },
+        "gradeWeightTugas": {
+          "type": "number"
+        },
+        "gradeWeightAsas": {
+          "type": "number"
+        },
+        "summaryStats": {
+          "type": "object",
+          "description": "Snapshot counts of students, schedules, attendance records, notes, grades, and holidays."
+        },
+        "archivedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "label",
+        "tahunAjaran",
+        "semester",
+        "schoolProfile",
+        "teacherProfile",
+        "gradeWeightTugas",
+        "gradeWeightAsas",
+        "summaryStats",
+        "archivedAt",
         "createdAt",
         "updatedAt"
       ]
@@ -403,6 +490,48 @@
         "$ref": "#/entities/HolidayDoc"
       },
       "description": "Custom school holidays belonging to the teacher workspace."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}": {
+      "schema": {
+        "$ref": "#/entities/AcademicYearArchive"
+      },
+      "description": "Archived academic year metadata snapshots owned by the teacher."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/StudentDoc"
+      },
+      "description": "Archived student records for a past academic year."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/schedules/{scheduleId}": {
+      "schema": {
+        "$ref": "#/entities/ScheduleDoc"
+      },
+      "description": "Archived teaching schedule records for a past academic year."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/attendance/{attendanceId}": {
+      "schema": {
+        "$ref": "#/entities/AttendanceDoc"
+      },
+      "description": "Archived attendance records for a past academic year."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/notes/{noteId}": {
+      "schema": {
+        "$ref": "#/entities/NoteDoc"
+      },
+      "description": "Archived teacher lesson journal notes for a past academic year."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/grades/{gradeId}": {
+      "schema": {
+        "$ref": "#/entities/GradeDoc"
+      },
+      "description": "Archived grade records for a past academic year."
+    },
+    "/teachers/{teacherId}/academicYears/{yearId}/holidays/{holidayId}": {
+      "schema": {
+        "$ref": "#/entities/HolidayDoc"
+      },
+      "description": "Archived school holiday records for a past academic year."
     }
   }
 }

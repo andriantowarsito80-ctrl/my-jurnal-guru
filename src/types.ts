@@ -73,6 +73,8 @@ export interface AuthCredentials {
   password: string;
 }
 
+export type SemesterType = 'Ganjil' | 'Genap';
+
 export type NavTab =
   | 'dashboard'
   | 'siswa'
@@ -83,7 +85,40 @@ export type NavTab =
   | 'nilai'
   | 'pengaturan';
 
+export interface ArchiveSummaryStats {
+  studentCount: number;
+  scheduleCount: number;
+  attendanceCount: number;
+  noteCount: number;
+  gradeCount: number;
+  holidayCount?: number;
+}
+
+export interface AcademicYearArchiveMeta {
+  id: string;
+  label: string;
+  tahunAjaran: string;
+  semester: SemesterType;
+  schoolProfile: SchoolProfile;
+  teacherProfile: TeacherProfile;
+  gradeWeightTugas: number;
+  gradeWeightAsas: number;
+  summaryStats: ArchiveSummaryStats;
+  archivedAtISO: string;
+}
+
+export interface StartNewAcademicYearParams {
+  archiveCurrentLabel: string;
+  newTahunAjaran: string;
+  newSemester: SemesterType;
+  newSubjects: string[];
+  studentMode: 'clear' | 'keep';
+  scheduleMode: 'clear' | 'keep';
+}
+
 export interface AppState {
+  activeAcademicYear: string;
+  activeSemester: SemesterType;
   schoolProfile: SchoolProfile;
   teacherProfile: TeacherProfile;
   students: Student[];
